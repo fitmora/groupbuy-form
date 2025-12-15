@@ -1,4 +1,6 @@
 <!doctype html>
+<html lang="ko">
+<head>
 <meta charset="utf-8" />
 <title>공동구매 주문</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -63,13 +65,28 @@
   .btn-resp{ width:33.333%; }
   .note-text{ text-align:center; margin-top:6px; }
 
+  /* 모달 스타일 수정 */
   .modal{ position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; padding:16px; z-index:9999; }
   .modal.open{ display:flex; }
   .modal-card{ width:min(520px, 96vw); background:#fff; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.2); overflow:hidden; }
   .modal-head{ padding:14px 18px; border-bottom:1px solid #eee; font-weight:700; }
-  .modal-body{ padding:18px; color:#0f172a; }
-  .modal-actions{ display:flex; gap:10px; justify-content:flex-end; padding:16px 18px; border-top:1px solid #eee; }
-  .btn-plain{ background:#e5e7eb; color:#0f172a; }
+  .modal-body{ padding:24px 18px; color:#0f172a; font-size:16px; line-height:1.5; text-align:center; }
+  .modal-actions{ display:flex; gap:10px; padding:0 18px 18px 18px; }
+  
+  /* 파란색 꽉 찬 버튼 스타일 */
+  .btn-confirm {
+    width: 100%;
+    background-color: #2563eb; /* blue-600 */
+    color: white;
+    padding: 12px 0;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 16px;
+    transition: background-color 0.2s;
+  }
+  .btn-confirm:hover {
+    background-color: #1d4ed8; /* blue-700 */
+  }
 
   @media (max-width: 768px){
     body{ padding:16px; max-width:100%; }
@@ -82,6 +99,8 @@
     .note-text{ text-align:right; }
   }
 </style>
+</head>
+<body>
 
 <h1>공동구매 주문</h1>
 
@@ -134,8 +153,7 @@
     <div class="modal-head" id="modalTitle">알림</div>
     <div class="modal-body" id="modalMsg">메시지</div>
     <div class="modal-actions">
-      <button id="modalClose" type="button" class="btn-plain">확인</button>
-      <button id="modalReset" type="button">처음으로</button>
+      <button id="modalBtn" type="button" class="btn-confirm">확인</button>
     </div>
   </div>
 </div>
@@ -240,23 +258,30 @@ function setCaretByDigitIndex(inputEl, digitIdx){
   inputEl.setSelectionRange(pos, pos);
 }
 
-/* ===== 모달 ===== */
-const modal = $('#modal'), modalMsg = $('#modalMsg');
-$('#modalClose').addEventListener('click', ()=>modal.classList.remove('open'));
-document.addEventListener('click', (e)=>{ if(e.target===modal) modal.classList.remove('open'); });
-document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && modal.classList.contains('open')) modal.classList.remove('open'); });
-function openModalHTML(html){ modalMsg.innerHTML = html; modal.classList.add('open'); }
-function resetForm(){
-  $('#buyer_name').value=''; $('#buyer_phone').value=''; $('#buyer_email').value=''; $('#buyer_addr').value='';
-  itemsWrap.innerHTML=''; itemsWrap.appendChild(createItemRow(0));
-  lastValidated = null; mode='edit';
-  setBuyerDisabled(false); setItemsDisabled(false);
-  reviewHeader.style.display='none'; result.innerHTML=''; removeConfirmBtn();
-  btn.textContent='주문 검토하기'; btn.disabled=false; refreshControls();
-  window.scrollTo({ top:0, behavior:'smooth' });
+/* ===== 모달 로직 수정됨 ===== */
+const modal = $('#modal'), modalMsg = $('#modalMsg'), modalBtn = $('#modalBtn');
+let isSuccessAction = false; // 성공 여부 플래그
+
+// 모달 닫기 혹은 초기화 함수
+function handleModalClick() {
   modal.classList.remove('open');
+  // 성공 상태면 페이지 새로고침(초기화)
+  if (isSuccessAction) {
+    window.location.reload();
+  }
+  // 에러 상태면 그냥 닫히고 끝 (사용자가 수정할 수 있게)
 }
-$('#modalReset').addEventListener('click', resetForm);
+
+modalBtn.addEventListener('click', handleModalClick);
+document.addEventListener('keydown', (e)=>{ 
+  if(e.key==='Escape' && modal.classList.contains('open')) handleModalClick(); 
+});
+
+function openModalHTML(html, success = false){ 
+  modalMsg.innerHTML = html; 
+  modal.classList.add('open'); 
+  isSuccessAction = success; // 플래그 설정
+}
 
 /* ===== 상태 ===== */
 let mode = 'edit';
@@ -555,7 +580,8 @@ async function submitFinal(){
   const vReq = validateRequired(payload);
   if (!vReq.ok) { alert(vReq.msg); return; }
 
-  openModalHTML('주문 접수 중입니다… 잠시만 기다려 주세요.');
+  // [수정] 전송 시작 알림 (success=false)
+  openModalHTML('주문 접수 중입니다… 잠시만 기다려 주세요.', false);
 
   const cbtn = $('#confirmBtn');
   submitting = true;
@@ -596,17 +622,19 @@ async function submitFinal(){
       if (totalTxt) html += `<br><small>${totalTxt}</small>`;
       if (sheetUrl) html += `<br><br><a href="${sheetUrl}" target="_blank" rel="noreferrer">구글 시트에서 주문 확인하기</a>`;
 
-      openModalHTML(html);
+      // [핵심] 성공 시 true 전달 -> 버튼 누르면 새로고침
+      openModalHTML(html, true);
+      
       if (cbtn) cbtn.disabled = true;
     }else{
       showReviewHeader('주문 실패');
-      openModalHTML('주문 접수 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+      openModalHTML('주문 접수 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.', false);
       btn.disabled = false;
       if (cbtn) cbtn.disabled = false;
     }
   }catch(e){
     out.textContent = '최종 전송 실패: ' + e;
-    openModalHTML('네트워크 오류가 발생했습니다. 다시 시도해 주세요.');
+    openModalHTML('네트워크 오류가 발생했습니다. 다시 시도해 주세요.', false);
     btn.disabled = false;
     const cbtn2 = $('#confirmBtn'); if (cbtn2) cbtn2.disabled = false;
   }finally{
@@ -645,3 +673,5 @@ btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else d
 
 (function init(){ initItems(); })();
 </script>
+</body>
+</html>

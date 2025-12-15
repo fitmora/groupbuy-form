@@ -175,6 +175,17 @@
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 
 <script>
+/* ===== DEBUG (필요시 삭제 가능) ===== */
+const qs = new URLSearchParams(location.search);
+const STORAGE_OK = (() => { try { const k='__ls_test__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; } catch(e){ return false; } })();
+function lsGet(k){ if(!STORAGE_OK)return null; try{return localStorage.getItem(k);}catch(e){return null;} }
+function lsSet(k,v){ if(!STORAGE_OK)return; try{localStorage.setItem(k,v);}catch(e){} }
+function lsRemove(k){ if(!STORAGE_OK)return; try{localStorage.removeItem(k);}catch(e){} }
+function setDebugByUrl(on){ const u=new URL(location.href); if(on) u.searchParams.set('debug','1'); else u.searchParams.set('debug','0'); location.href=u.toString(); }
+const DEBUG = (qs.get('debug')==='1')||(lsGet('DEBUG')==='1');
+if(DEBUG) document.documentElement.classList.add('debug-on');
+document.addEventListener('keydown', (e)=>{ if(!e.altKey)return; if(e.code==='KeyD'||(e.key&&e.key.toLowerCase()==='d')){ if(STORAGE_OK){ const on=lsGet('DEBUG')==='1'; if(on) lsRemove('DEBUG'); else lsSet('DEBUG','1'); location.reload(); }else{ const on=(new URLSearchParams(location.search)).get('debug')==='1'; setDebugByUrl(!on); } } });
+
 /* ===== 설정 ===== */
 const VALIDATE_URL = "https://primary-production-97a64.up.railway.app/webhook/groupbuy/validate";
 const SUBMIT_URL   = "https://primary-production-97a64.up.railway.app/webhook/internal-order-feed";
@@ -257,7 +268,6 @@ $('#buyer_phone').addEventListener('input', function() {
   const selStart = this.selectionStart || 0;
   const digitsBefore = (raw.slice(0, selStart).match(/\d/g) || []).length;
   this.value = formatPhoneKR(raw);
-  // 커서 위치 보정 로직 생략(간소화)
 });
 
 /* ===== 아이템 행 생성 ===== */
@@ -511,7 +521,12 @@ async function submitFinal(){
     const body = {
       ...payload,
       _validated: lastValidated || null, // 참고용 원본도 같이 보냄
-      _client: { ts: Date.now() }
+      _client: { ts: Date.now() },
+      // 이메일 설정
+      _notify: {
+        customer: { send: true },
+        admin:    { send: true, email: ADMIN_EMAIL, mode: 'summary' }
+      }
     };
 
     const res = await fetch(SUBMIT_URL, {

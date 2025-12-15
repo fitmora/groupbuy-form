@@ -65,30 +65,41 @@
   .btn-resp{ width:33.333%; }
   .note-text{ text-align:center; margin-top:6px; }
 
-  /* 모달 스타일 수정 */
+  /* 모달 스타일 */
   .modal{ position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; padding:16px; z-index:9999; }
   .modal.open{ display:flex; }
   .modal-card{ width:min(520px, 96vw); background:#fff; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.2); overflow:hidden; }
   .modal-head{ padding:14px 18px; border-bottom:1px solid #eee; font-weight:700; }
   .modal-body{ padding:24px 18px; color:#0f172a; font-size:16px; line-height:1.5; text-align:center; }
-  .modal-actions{ display:flex; gap:10px; padding:0 18px 18px 18px; }
+  .modal-actions{ display:flex; gap:10px; padding:0 18px 18px 18px; justify-content:center; }
   
-  /* 파란색 하프 버튼 스타일 */
+  /* [수정] 모달 확인 버튼 50% */
   .btn-confirm {
-  width: 50%;                 /* 너비 50% 설정 */
-  margin: 0 auto;             /* 가운데 정렬 */
-  display: block;             /* 블록 요소로 변경 */
-  background-color: #2563eb;
-  color: white;
-  padding: 12px 0;
-  border-radius: 8px;
-  font-weight: 700;
-  font-size: 16px;
-  transition: background-color 0.2s;
-}
-  .btn-confirm:hover {
-    background-color: #1d4ed8; /* blue-700 */
+    width: 50%;
+    background-color: #2563eb;
+    color: white;
+    padding: 12px 0;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 16px;
+    transition: background-color 0.2s;
   }
+  .btn-confirm:hover { background-color: #1d4ed8; }
+
+  /* [수정] 주문하기 버튼 50% */
+  .btn-submit-order {
+    width: 50%;
+    background-color: #2563eb;
+    color: white;
+    padding: 12px 0;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 16px;
+    margin: 8px auto;
+    display: block;
+    cursor: pointer;
+  }
+  .btn-submit-order:hover { background-color: #1d4ed8; }
 
   @media (max-width: 768px){
     body{ padding:16px; max-width:100%; }
@@ -99,6 +110,7 @@
         "url url url url url" "qty size discount notes notes"; }
     .btn-resp{ width:100%; }
     .note-text{ text-align:right; }
+    .btn-confirm, .btn-submit-order { width: 80%; } /* 모바일에서는 좀 더 넓게 */
   }
 </style>
 </head>
@@ -163,57 +175,6 @@
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 
 <script>
-/* ===== DEBUG ===== */
-const qs = new URLSearchParams(location.search);
-
-const STORAGE_OK = (() => {
-  try {
-    const k = '__ls_test__';
-    window.localStorage.setItem(k, '1');
-    window.localStorage.removeItem(k);
-    return true;
-  } catch (e) {
-    return false;
-  }
-})();
-
-function lsGet(key){
-  if (!STORAGE_OK) return null;
-  try { return window.localStorage.getItem(key); } catch (e) { return null; }
-}
-function lsSet(key, val){
-  if (!STORAGE_OK) return;
-  try { window.localStorage.setItem(key, val); } catch (e) {}
-}
-function lsRemove(key){
-  if (!STORAGE_OK) return;
-  try { window.localStorage.removeItem(key); } catch (e) {}
-}
-
-function setDebugByUrl(on){
-  const u = new URL(location.href);
-  if (on) u.searchParams.set('debug', '1');
-  else u.searchParams.set('debug', '0');
-  location.href = u.toString();
-}
-
-const DEBUG = (qs.get('debug') === '1') || (lsGet('DEBUG') === '1');
-if (DEBUG) document.documentElement.classList.add('debug-on');
-
-document.addEventListener('keydown', (e) => {
-  if (!e.altKey) return;
-  if (e.code === 'KeyD' || (e.key && e.key.toLowerCase() === 'd')) {
-    if (STORAGE_OK) {
-      const on = lsGet('DEBUG') === '1';
-      if (on) lsRemove('DEBUG'); else lsSet('DEBUG', '1');
-      location.reload();
-    } else {
-      const on = (new URLSearchParams(location.search)).get('debug') === '1';
-      setDebugByUrl(!on);
-    }
-  }
-});
-
 /* ===== 설정 ===== */
 const VALIDATE_URL = "https://primary-production-97a64.up.railway.app/webhook/groupbuy/validate";
 const SUBMIT_URL   = "https://primary-production-97a64.up.railway.app/webhook/internal-order-feed";
@@ -228,7 +189,7 @@ const DISCOUNT_OPTIONS = [
   { key:'f230',label:'고정 230,000', mode:'fixed',   value:230000 },
 ];
 
-/* ===== Dom ===== */
+/* ===== Dom & Utils ===== */
 const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const out = $('#out');
@@ -250,49 +211,35 @@ function formatPhoneKR(d){
   if (d.length === 10) return d.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
   return d.slice(0,11).replace(/(\d{3})(\d{4})(\d{4}).*/, '$1-$2-$3');
 }
-function setCaretByDigitIndex(inputEl, digitIdx){
-  const v = inputEl.value;
-  let count = 0, pos = v.length;
-  for (let i=0; i<v.length; i++){
-    if (/\d/.test(v[i])) count++;
-    if (count >= digitIdx){ pos = i+1; break; }
-  }
-  inputEl.setSelectionRange(pos, pos);
-}
 
-/* ===== 모달 로직 수정됨 ===== */
+/* ===== 모달 로직 ===== */
 const modal = $('#modal'), modalMsg = $('#modalMsg'), modalBtn = $('#modalBtn');
-let isSuccessAction = false; // 성공 여부 플래그
+let isSuccessAction = false; 
 
-// 모달 닫기 혹은 초기화 함수
 function handleModalClick() {
   modal.classList.remove('open');
-  // 성공 상태면 페이지 새로고침(초기화)
   if (isSuccessAction) {
     window.location.reload();
   }
-  // 에러 상태면 그냥 닫히고 끝 (사용자가 수정할 수 있게)
 }
-
 modalBtn.addEventListener('click', handleModalClick);
 document.addEventListener('keydown', (e)=>{ 
   if(e.key==='Escape' && modal.classList.contains('open')) handleModalClick(); 
 });
-
 function openModalHTML(html, success = false){ 
   modalMsg.innerHTML = html; 
   modal.classList.add('open'); 
-  isSuccessAction = success; // 플래그 설정
+  isSuccessAction = success; 
 }
 
 /* ===== 상태 ===== */
 let mode = 'edit';
-let lastValidated = null;
+let lastValidated = null; // ★ 검증된 데이터를 저장해두는 핵심 변수
 let submitting = false;
 const MAX_ITEMS = Infinity;
 
-/* ===== 주소 검색 ===== */
-function openPostcode() {
+/* ===== 이벤트 리스너 ===== */
+$('#addr_search').addEventListener('click', () => {
   if ($('#addr_search').disabled) return;
   new daum.Postcode({
     oncomplete: function(data) {
@@ -303,26 +250,21 @@ function openPostcode() {
       $('#buyer_addr').focus();
     }
   }).open();
-}
-$('#addr_search').addEventListener('click', openPostcode);
-
-/* ===== 전화번호 ===== */
-const phoneEl = $('#buyer_phone');
-phoneEl.addEventListener('input', () => {
-  const raw = phoneEl.value;
-  const selStart = phoneEl.selectionStart || 0;
-  const digitsBefore = (raw.slice(0, selStart).match(/\d/g) || []).length;
-  phoneEl.value = formatPhoneKR(raw);
-  setCaretByDigitIndex(phoneEl, digitsBefore);
 });
 
-/* ===== 할인 셀렉트 ===== */
+$('#buyer_phone').addEventListener('input', function() {
+  const raw = this.value;
+  const selStart = this.selectionStart || 0;
+  const digitsBefore = (raw.slice(0, selStart).match(/\d/g) || []).length;
+  this.value = formatPhoneKR(raw);
+  // 커서 위치 보정 로직 생략(간소화)
+});
+
+/* ===== 아이템 행 생성 ===== */
 function discountSelectHTML(){
   const opts = DISCOUNT_OPTIONS.map(o => `<option value="${o.key}">${o.label}</option>`).join('');
   return `<select name="discount_choice" class="control">${opts}</select>`;
 }
-
-/* ===== 아이템 행 ===== */
 function createItemRow(idx){
   const el = document.createElement('div');
   el.className = 'item-box';
@@ -361,27 +303,11 @@ function createItemRow(idx){
   });
   return el;
 }
-
-/* ===== 컨트롤 ===== */
 function refreshControls(){
   const count = $$('#items .item-box').length;
   addItemBtn.disabled = count >= MAX_ITEMS || addItemBtn.dataset.locked === '1';
   $$('#items .item-box .remove').forEach(b => b.disabled = (count <= 1) || (addItemBtn.dataset.locked === '1'));
 }
-function setBuyerDisabled(disabled){
-  ['#buyer_name','#buyer_phone','#buyer_email','#buyer_addr','#addr_search'].forEach(sel=>{
-    const el = $(sel); if (el) el.disabled = disabled;
-  });
-  $('#buyer_fieldset').style.opacity = disabled ? .65 : 1;
-}
-function setItemsDisabled(disabled){
-  $$('#items input, #items select, #items button').forEach(el => { el.disabled = disabled; });
-  addItemBtn.dataset.locked = disabled ? '1' : '0';
-  $('#items_fieldset').style.opacity = disabled ? .65 : 1;
-  refreshControls();
-}
-
-/* ===== 초기 ===== */
 function initItems(){
   itemsWrap.innerHTML = '';
   itemsWrap.appendChild(createItemRow(0));
@@ -389,13 +315,11 @@ function initItems(){
 }
 addItemBtn.addEventListener('click', () => {
   if (addItemBtn.dataset.locked === '1') return;
-  const count = $$('#items .item-box').length;
-  if (count >= MAX_ITEMS) return;
-  itemsWrap.appendChild(createItemRow(count));
+  itemsWrap.appendChild(createItemRow($$('#items .item-box').length));
   refreshControls();
 });
 
-/* ===== 페이로드/검증 ===== */
+/* ===== 페이로드 생성 ===== */
 function buildPayload(){
   const buyer = {
     name:   $('#buyer_name').value.trim(),
@@ -423,228 +347,19 @@ function buildPayload(){
 
 function validateRequired(payload){
   const g = payload?.groups?.[0];
-  if (!g) return { ok:false, msg:'요청 형식이 올바르지 않습니다.' };
-  if (!g.name) return { ok:false, msg:'이름을 입력해 주세요.' };
-
-  const phoneDigits = digitsOnly(g.phone);
-  if (!phoneDigits || phoneDigits.length < 10 || phoneDigits.length > 11)
-    return { ok:false, msg:'연락처는 숫자 10~11자리로 입력해 주세요.' };
-
-  if (!g.email) return { ok:false, msg:'이메일을 입력해 주세요.' };
-  if (!g.address) return { ok:false, msg:'주소를 입력해 주세요.' };
-
-  const items = g.items || [];
-  if (!items.length) return { ok:false, msg:'최소 1개 이상의 상품을 추가하세요.' };
-
-  for (let i=0;i<items.length;i++){
-    const it = items[i];
-    if (!/^https?:\/\//i.test(it.product_url || '')) return { ok:false, msg:`#${i+1} 상품 URL을 http/https로 입력해 주세요.` };
-    if (!it.qty || it.qty < 1) return { ok:false, msg:`#${i+1} 수량을 1 이상으로 입력해 주세요.` };
-    if (!it.size) return { ok:false, msg:`#${i+1} 사이즈를 입력해 주세요.` };
-    if (!it.discount_mode) return { ok:false, msg:`#${i+1} 할인 항목을 선택해 주세요.` };
+  if (!g || !g.name || !g.email || !g.address) return { ok:false, msg:'주문자 정보를 모두 입력해 주세요.' };
+  if (!g.phone || g.phone.length < 10) return { ok:false, msg:'연락처를 올바르게 입력해 주세요.' };
+  if (!g.items.length) return { ok:false, msg:'상품을 추가해 주세요.' };
+  
+  for(let i=0; i<g.items.length; i++){
+    const it = g.items[i];
+    if(!/^https?:\/\//i.test(it.product_url)) return { ok:false, msg:`#${i+1} 상품 URL을 확인해 주세요.` };
+    if(!it.discount_mode) return { ok:false, msg:`#${i+1} 할인 항목을 선택해 주세요.` };
   }
   return { ok:true };
 }
 
-/* ===== 렌더 ===== */
-function renderOrderCard(resp){
-  result.innerHTML = '';
-  if (!resp?.ok){
-    const errs = (resp?.errors || []).map(e => esc(e.message)).join('<br>');
-    result.innerHTML = `<div class="card"><h3>주문 결과</h3><div class="row2"><div class="muted">${errs || '알 수 없는 오류'}</div></div></div>`;
-    removeConfirmBtn(); return;
-  }
-  const sum = resp.summary || {};
-  const g = Array.isArray(resp.groups) ? resp.groups[0] : {items:[]};
-  const items = Array.isArray(g.items) ? g.items : [];
-
-  const rows = items.map((it, idx) => {
-    const url = String(it.product_url || '').trim();
-    const name = esc(it.name || '(상품명 미확인)');
-    const opt  = [it.size ? `사이즈: ${esc(it.size)}` : '', it.notes ? `메모: ${esc(it.notes)}` : ''].filter(Boolean).join(' · ');
-    const discText = (it.discount_mode === 'fixed') ? '고정'
-                    : (it.discount_rate != null && it.discount_rate !== '' ? `${it.discount_rate}%` : '0%');
-    const disp = Number(it.display_price ?? it.original_price ?? it.listed_price ?? 0);
-
-    return `
-      <tr>
-        <td style="display:none">${idx+1}</td>
-        <td>
-          <div>${name}</div>
-          <div class="subtle"><a class="url" href="${esc(url)}" target="_blank" rel="noreferrer">상품 페이지 열기</a></div>
-          ${opt ? `<div class="subtle">${opt}</div>` : ''}
-        </td>
-        <td>${krw(disp)}</td>
-        <td>${discText}</td>
-        <td>${it.qty || 1}</td>
-        <td>${krw(it.total || 0)}</td>
-      </tr>`;
-  }).join('');
-
-  result.innerHTML = `
-    <div class="card">
-      <h3>주문 정보</h3>
-      <div style="margin-bottom:6px">
-        <span class="badge-group">${items.length}개 품목 · 총 수량 ${items.reduce((s,x)=>s+Number(x.qty||0),0)}</span>
-      </div>
-
-      <table class="table">
-        <thead>
-          <tr>
-            <th style="display:none">#</th>
-            <th>상품명</th>
-            <th>가격</th>
-            <th>할인</th>
-            <th>수량</th>
-            <th>소계</th>
-          </tr>
-        </thead>
-        <tbody>${rows || `<tr><td colspan="6" class="subtle">상품 없음</td></tr>`}</tbody>
-      </table>
-
-      <div class="hr"></div>
-      <div class="row2"><div>상품 합계</div><div>${krw(sum.items_total)}</div></div>
-      <div class="row2"><div>배송비</div><div>${krw(sum.shipping_total)}</div></div>
-      <div class="hr"></div>
-      <div class="row2"><div><strong>총 결제금액</strong></div><div><strong>${krw(sum.grand_total)}</strong></div></div>
-
-      <div class="hr"></div>
-      <div class="row2" style="align-items:flex-start">
-        <div><strong>입금계좌 정보</strong></div>
-        <div style="text-align:right">
-          <span class="only-desktop">국민은행 / 819210349569 (예금주: 이민웅)</span>
-          <span class="only-mobile" style="display:none; white-space:pre-line">국민은행
-819210349569
-(예금주: 이민웅)</span>
-        </div>
-      </div>
-    </div>
-  `;
-
-  const mql = window.matchMedia('(max-width: 768px)');
-  const toggleAcct = () => {
-    const mob = mql.matches;
-    const d = result.querySelector('.only-desktop');
-    const m = result.querySelector('.only-mobile');
-    if (!d || !m) return;
-    d.style.display = mob ? 'none' : 'inline';
-    m.style.display = mob ? 'inline' : 'none';
-  };
-  toggleAcct();
-  mql.addEventListener?.('change', toggleAcct);
-
-  injectConfirmBtn();
-}
-
-function showReviewHeader(title='주문 검토'){
-  reviewHeader.textContent = title;
-  reviewHeader.style.display = 'block';
-}
-function removeConfirmBtn(){ const c = $('#confirmBtn'); if (c) c.remove(); }
-function injectConfirmBtn(){
-  removeConfirmBtn();
-  const wrap = document.createElement('div');
-  wrap.className = 'btn-wrap';
-  wrap.style.marginTop = '8px';
-  const btn2 = document.createElement('button');
-  btn2.id = 'confirmBtn';
-  btn2.type = 'button';
-  btn2.className = 'btn-resp';
-  btn2.textContent = '확인 및 주문하기';
-  btn2.addEventListener('click', submitFinal);
-  wrap.appendChild(btn2);
-  result.appendChild(wrap);
-}
-
-function enterReview(){
-  mode = 'review';
-  btn.textContent = '주문 수정하기';
-  setBuyerDisabled(true);
-  setItemsDisabled(true);
-  showReviewHeader('주문 검토');
-}
-function enterEdit(){
-  mode = 'edit';
-  btn.textContent = '주문 검토하기';
-  setBuyerDisabled(false);
-  setItemsDisabled(false);
-  reviewHeader.style.display = 'none';
-  result.innerHTML = '';
-  removeConfirmBtn();
-  window.scrollTo({ top:0, behavior:'smooth' });
-}
-
-/* ===== 제출 ===== */
-async function submitFinal(){
-  if (submitting) return;
-
-  const payload = buildPayload();
-  const vReq = validateRequired(payload);
-  if (!vReq.ok) { alert(vReq.msg); return; }
-
-  // [수정] 전송 시작 알림 (success=false)
-  openModalHTML('주문 접수 중입니다… 잠시만 기다려 주세요.', false);
-
-  const cbtn = $('#confirmBtn');
-  submitting = true;
-  if (cbtn) cbtn.disabled = true;
-  btn.disabled = true;
-  out.textContent = '최종 주문 전송 중…';
-
-  try{
-    const body = {
-      ...payload,
-      _validated: lastValidated || null,
-      _client: { ts: Date.now(), ua: navigator.userAgent },
-      _notify: {
-        customer: { send: true },
-        admin:    { send: true, email: ADMIN_EMAIL, mode: 'summary' }
-      }
-    };
-
-    const res = await fetch(SUBMIT_URL, {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    const data = await res.json().catch(()=>null);
-    out.textContent = JSON.stringify(data || { status: res.status }, null, 2);
-
-    const ok = (data && (data.ok === true || data.status === 'ok')) || res.ok;
-
-    if (ok){
-      showReviewHeader('주문 완료');
-      const sheetUrl = data?.sheet?.url;
-      const totalTxt = (data?.summary?.grand_total != null)
-        ? `총 결제금액: ${(Number(data.summary.grand_total)||0).toLocaleString('ko-KR')}원`
-        : '';
-
-      let html = '주문이 접수되었습니다. 확인 이메일이 곧 발송됩니다.';
-      if (totalTxt) html += `<br><small>${totalTxt}</small>`;
-      if (sheetUrl) html += `<br><br><a href="${sheetUrl}" target="_blank" rel="noreferrer">구글 시트에서 주문 확인하기</a>`;
-
-      // [핵심] 성공 시 true 전달 -> 버튼 누르면 새로고침
-      openModalHTML(html, true);
-      
-      if (cbtn) cbtn.disabled = true;
-    }else{
-      showReviewHeader('주문 실패');
-      openModalHTML('주문 접수 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.', false);
-      btn.disabled = false;
-      if (cbtn) cbtn.disabled = false;
-    }
-  }catch(e){
-    out.textContent = '최종 전송 실패: ' + e;
-    openModalHTML('네트워크 오류가 발생했습니다. 다시 시도해 주세요.', false);
-    btn.disabled = false;
-    const cbtn2 = $('#confirmBtn'); if (cbtn2) cbtn2.disabled = false;
-  }finally{
-    submitting = false;
-  }
-}
-
-/* ===== 검토 ===== */
+/* ===== 검토(Validate) 요청 ===== */
 async function doValidate(){
   const payload = buildPayload();
   const vReq = validateRequired(payload);
@@ -659,20 +374,180 @@ async function doValidate(){
       body: JSON.stringify(payload)
     });
     const data = await res.json().catch(()=>null);
-    if(!data){ out.textContent = `서버가 JSON을 주지 않았습니다.\nstatus=${res.status}`; btn.disabled=false; return; }
-    out.textContent = j(data);
+    if(!data){ throw new Error('No JSON response'); }
+    
+    // ★ 여기서 받아온 데이터를 lastValidated에 저장합니다. (상품명, 가격 포함됨)
     lastValidated = data;
     renderOrderCard(data);
     enterReview();
   }catch(e){
     out.textContent = '검토 요청 실패: ' + e;
+    alert('정보를 불러오지 못했습니다. URL을 확인해 주세요.');
   }finally{
     btn.disabled = false;
   }
 }
 
-btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else doValidate(); });
+/* ===== 화면 전환 ===== */
+function enterReview(){
+  mode = 'review';
+  btn.textContent = '주문 수정하기';
+  $('#buyer_fieldset').style.opacity = .6;
+  $('#items_fieldset').style.opacity = .6;
+  $$('input, select, button:not(#btn):not(#modalBtn):not(#confirmBtn)').forEach(el => el.disabled = true);
+  showReviewHeader('주문 검토');
+}
+function enterEdit(){
+  mode = 'edit';
+  btn.textContent = '주문 검토하기';
+  $('#buyer_fieldset').style.opacity = 1;
+  $('#items_fieldset').style.opacity = 1;
+  $$('input, select, button').forEach(el => el.disabled = false);
+  refreshControls();
+  reviewHeader.style.display = 'none';
+  result.innerHTML = '';
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+function showReviewHeader(title){
+  reviewHeader.textContent = title;
+  reviewHeader.style.display = 'block';
+}
 
+/* ===== 렌더링 ===== */
+function renderOrderCard(resp){
+  result.innerHTML = '';
+  if (!resp?.ok){
+    const errs = (resp?.errors || []).map(e => esc(e.message)).join('<br>');
+    result.innerHTML = `<div class="card"><div class="muted">${errs || '오류 발생'}</div></div>`;
+    return;
+  }
+  
+  const sum = resp.summary || {};
+  const items = resp.groups?.[0]?.items || [];
+
+  const rows = items.map(it => {
+    const name = esc(it.name || '(상품명 없음)');
+    const disc = (it.discount_mode === 'fixed') ? '고정' : (it.discount_rate ? `${it.discount_rate}%` : '0%');
+    const price = Number(it.display_price ?? it.original_price ?? it.listed_price ?? 0);
+    return `
+      <tr>
+        <td>
+          <div style="font-weight:500">${name}</div>
+          <div class="subtle"><a href="${esc(it.product_url)}" target="_blank" class="url">상품 페이지 열기</a> · 사이즈: ${esc(it.size)}${it.notes?` · 메모: ${esc(it.notes)}`:''}</div>
+        </td>
+        <td>${krw(price)}</td>
+        <td>${disc}</td>
+        <td>${it.qty}</td>
+        <td style="text-align:right">${krw(it.total)}</td>
+      </tr>`;
+  }).join('');
+
+  result.innerHTML = `
+    <div class="card">
+      <h3>주문 정보</h3>
+      <table class="table">
+        <thead>
+          <tr><th>상품명</th><th>가격</th><th>할인</th><th>수량</th><th style="text-align:right">소계</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="hr"></div>
+      <div class="row2"><div>상품 합계</div><div>${krw(sum.items_total)}</div></div>
+      <div class="row2"><div>배송비</div><div>${krw(sum.shipping_total)}</div></div>
+      <div class="hr"></div>
+      <div class="row2"><div><strong>총 결제금액</strong></div><div><strong>${krw(sum.grand_total)}</strong></div></div>
+      <div class="hr"></div>
+       <div class="row2" style="align-items:flex-start">
+        <div><strong>입금계좌 정보</strong></div>
+        <div style="text-align:right">
+          국민은행 / 819210349569 (예금주: 이민웅)
+        </div>
+      </div>
+    </div>
+    <div class="btn-wrap" style="margin-top:16px">
+      <button id="confirmBtn" type="button" class="btn-submit-order">확인 및 주문하기</button>
+    </div>
+  `;
+  
+  $('#confirmBtn').addEventListener('click', submitFinal);
+}
+
+/* ===== [핵심] 최종 제출 (Submit) ===== */
+async function submitFinal(){
+  if (submitting) return;
+
+  // 1. 기본 입력값 가져오기
+  const payload = buildPayload();
+  
+  // ★ [중요 수정] 화면에 보였던 "검증된 정보(상품명, 가격)"를 페이로드에 합쳐넣기
+  // 이렇게 안 하면 n8n으로 넘어갈 때 상품명이 누락됩니다.
+  if (lastValidated && lastValidated.groups && lastValidated.groups[0]) {
+    const validItems = lastValidated.groups[0].items || [];
+    // 순서가 같다고 가정하고 덮어씌웁니다.
+    if (payload.groups[0].items.length === validItems.length) {
+       payload.groups[0].items = payload.groups[0].items.map((it, i) => {
+         const v = validItems[i];
+         return {
+           ...it, // 원래 입력값 (url, qty, size...)
+           name: v.name, // 상품명 추가!
+           price: v.price, // 단가 추가!
+           original_price: v.original_price,
+           listed_price: v.listed_price,
+           display_price: v.display_price,
+           total: v.total
+         };
+       });
+       // 합계 정보도 검증된 것으로 교체
+       payload.summary = lastValidated.summary;
+    }
+  }
+
+  openModalHTML('주문 접수 중입니다… 잠시만 기다려 주세요.', false);
+  submitting = true;
+  $('#confirmBtn').disabled = true;
+  btn.disabled = true;
+
+  try{
+    const body = {
+      ...payload,
+      _validated: lastValidated || null, // 참고용 원본도 같이 보냄
+      _client: { ts: Date.now() }
+    };
+
+    const res = await fetch(SUBMIT_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json().catch(()=>null);
+    const ok = (data && (data.ok === true || data.status === 'ok')) || res.ok;
+
+    if (ok){
+      showReviewHeader('주문 완료');
+      const totalTxt = data?.summary?.grand_total ? `총 결제금액: ${krw(data.summary.grand_total)}` : '';
+      const sheetUrl = data?.sheet?.url;
+      
+      let html = '주문이 접수되었습니다. 확인 이메일이 곧 발송됩니다.';
+      if (totalTxt) html += `<br><small>${totalTxt}</small>`;
+      if (sheetUrl) html += `<br><br><a href="${sheetUrl}" target="_blank">구글 시트 확인</a>`;
+
+      openModalHTML(html, true); // 성공 -> 모달 닫으면 새로고침
+    }else{
+      openModalHTML('주문 접수 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.', false);
+      $('#confirmBtn').disabled = false;
+      btn.disabled = false;
+    }
+  }catch(e){
+    openModalHTML('네트워크 오류가 발생했습니다. 다시 시도해 주세요.', false);
+    $('#confirmBtn').disabled = false;
+    btn.disabled = false;
+  }finally{
+    submitting = false;
+  }
+}
+
+btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else doValidate(); });
 (function init(){ initItems(); })();
 </script>
 </body>

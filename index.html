@@ -73,7 +73,7 @@
   .modal-body{ padding:24px 18px; color:#0f172a; font-size:16px; line-height:1.5; text-align:center; }
   .modal-actions{ display:flex; gap:10px; padding:0 18px 18px 18px; justify-content:center; }
   
-  /* [수정] 모달 확인 버튼 50% */
+  /* 모달 확인 버튼 50% */
   .btn-confirm {
     width: 50%;
     background-color: #2563eb;
@@ -86,7 +86,7 @@
   }
   .btn-confirm:hover { background-color: #1d4ed8; }
 
-  /* [수정] 주문하기 버튼 50% */
+  /* 주문하기 버튼 50% */
   .btn-submit-order {
     width: 50%;
     background-color: #2563eb;
@@ -175,7 +175,7 @@
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 
 <script>
-/* ===== DEBUG (필요시 삭제 가능) ===== */
+/* ===== DEBUG ===== */
 const qs = new URLSearchParams(location.search);
 const STORAGE_OK = (() => { try { const k='__ls_test__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; } catch(e){ return false; } })();
 function lsGet(k){ if(!STORAGE_OK)return null; try{return localStorage.getItem(k);}catch(e){return null;} }
@@ -245,7 +245,7 @@ function openModalHTML(html, success = false){
 
 /* ===== 상태 ===== */
 let mode = 'edit';
-let lastValidated = null; // ★ 검증된 데이터를 저장해두는 핵심 변수
+let lastValidated = null; 
 let submitting = false;
 const MAX_ITEMS = Infinity;
 
@@ -386,7 +386,6 @@ async function doValidate(){
     const data = await res.json().catch(()=>null);
     if(!data){ throw new Error('No JSON response'); }
     
-    // ★ 여기서 받아온 데이터를 lastValidated에 저장합니다. (상품명, 가격 포함됨)
     lastValidated = data;
     renderOrderCard(data);
     enterReview();
@@ -436,6 +435,11 @@ function renderOrderCard(resp){
   const items = resp.groups?.[0]?.items || [];
 
   const rows = items.map(it => {
+    // [UI 표시용] 여기서도 브랜드명이 보이면 자를 수 있지만, 원본 데이터 보존을 위해 일단 그대로 둡니다.
+    // 만약 화면에서도 "온유어마크"를 빼고 싶다면 아래 코드를 활성화하세요.
+    // const cleanName = (it.name || '').replace(/^.*온유어마크[^|]*\|\s*/i, '').trim();
+    // const name = esc(cleanName || '(상품명 없음)');
+    
     const name = esc(it.name || '(상품명 없음)');
     const disc = (it.discount_mode === 'fixed') ? '고정' : (it.discount_rate ? `${it.discount_rate}%` : '0%');
     const price = Number(it.display_price ?? it.original_price ?? it.listed_price ?? 0);
@@ -489,25 +493,30 @@ async function submitFinal(){
   // 1. 기본 입력값 가져오기
   const payload = buildPayload();
   
-  // ★ [중요 수정] 화면에 보였던 "검증된 정보(상품명, 가격)"를 페이로드에 합쳐넣기
-  // 이렇게 안 하면 n8n으로 넘어갈 때 상품명이 누락됩니다.
+  // 2. 검증된 상품 정보(이름, 가격 등) 합치기 + [상품명 브랜드 제거]
   if (lastValidated && lastValidated.groups && lastValidated.groups[0]) {
     const validItems = lastValidated.groups[0].items || [];
-    // 순서가 같다고 가정하고 덮어씌웁니다.
+    
     if (payload.groups[0].items.length === validItems.length) {
        payload.groups[0].items = payload.groups[0].items.map((it, i) => {
          const v = validItems[i];
+         
+         // [NEW] 브랜드 접두사 제거 로직 (온유어마크 ... | )
+         let rawName = v.name || '';
+         // 패턴: "온유어마크"로 시작하고 "|"가 나올 때까지의 모든 문자열을 제거
+         let cleanName = rawName.replace(/^.*온유어마크[^|]*\|\s*/i, '').trim();
+         if (!cleanName) cleanName = rawName; // 만약 다 지워져버리면 원본 사용
+
          return {
-           ...it, // 원래 입력값 (url, qty, size...)
-           name: v.name, // 상품명 추가!
-           price: v.price, // 단가 추가!
+           ...it, 
+           name: cleanName, // 정제된 이름 사용
+           price: v.price,
            original_price: v.original_price,
            listed_price: v.listed_price,
            display_price: v.display_price,
            total: v.total
          };
        });
-       // 합계 정보도 검증된 것으로 교체
        payload.summary = lastValidated.summary;
     }
   }
@@ -520,9 +529,8 @@ async function submitFinal(){
   try{
     const body = {
       ...payload,
-      _validated: lastValidated || null, // 참고용 원본도 같이 보냄
+      _validated: lastValidated || null, 
       _client: { ts: Date.now() },
-      // 이메일 설정
       _notify: {
         customer: { send: true },
         admin:    { send: true, email: ADMIN_EMAIL, mode: 'summary' }
@@ -547,7 +555,7 @@ async function submitFinal(){
       if (totalTxt) html += `<br><small>${totalTxt}</small>`;
       if (sheetUrl) html += `<br><br><a href="${sheetUrl}" target="_blank">구글 시트 확인</a>`;
 
-      openModalHTML(html, true); // 성공 -> 모달 닫으면 새로고침
+      openModalHTML(html, true); 
     }else{
       openModalHTML('주문 접수 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.', false);
       $('#confirmBtn').disabled = false;

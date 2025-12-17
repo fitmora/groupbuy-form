@@ -8,7 +8,24 @@
   :root{ --bg:#fafafa;--card:#fff;--bd:#e5e7eb;--muted:#64748b;--em:#0a7cff; --control-h:44px; }
   *{ box-sizing:border-box }
   body{ font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; padding:24px; max-width:960px; margin:auto; background:var(--bg); color:#111; }
-  h1{ font-size:22px; margin:0 0 16px }
+  
+  /* [수정] 헤더 영역 스타일: 제목과 주문방법 버튼 양쪽 정렬 */
+  .main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .main-header h1 { margin: 0; font-size:22px; }
+  
+  /* 주문방법 링크 버튼 스타일 */
+  .btn-link { 
+    background: none; 
+    border: none; 
+    color: var(--em); 
+    cursor: pointer; 
+    font-weight: 600; 
+    font-size: 15px; 
+    padding: 8px 4px; 
+    text-decoration: none;
+  }
+  .btn-link:hover { text-decoration: underline; }
+
   fieldset{ border:1px solid var(--bd); border-radius:12px; padding:16px; margin:16px 0; background:var(--card) }
   legend{ padding:0 6px; color:#334155; font-weight:700 }
   label{ display:block; margin:10px 0 6px; font-weight:600 }
@@ -65,41 +82,25 @@
   .btn-resp{ width:33.333%; }
   .note-text{ text-align:center; margin-top:6px; }
 
-  /* 모달 스타일 */
-  .modal{ position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; padding:16px; z-index:9999; }
+  /* 기본 모달 스타일 (알림용) */
+  .modal{ position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; padding:16px; z-index:9990; }
   .modal.open{ display:flex; }
   .modal-card{ width:min(520px, 96vw); background:#fff; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.2); overflow:hidden; }
   .modal-head{ padding:14px 18px; border-bottom:1px solid #eee; font-weight:700; }
   .modal-body{ padding:24px 18px; color:#0f172a; font-size:16px; line-height:1.5; text-align:center; }
   .modal-actions{ display:flex; gap:10px; padding:0 18px 18px 18px; justify-content:center; }
   
-  /* 모달 확인 버튼 50% */
-  .btn-confirm {
-    width: 50%;
-    background-color: #2563eb;
-    color: white;
-    padding: 12px 0;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 16px;
-    transition: background-color 0.2s;
-  }
+  .btn-confirm { width: 50%; background-color: #2563eb; color: white; padding: 12px 0; border-radius: 8px; font-weight: 700; font-size: 16px; transition: background-color 0.2s; }
   .btn-confirm:hover { background-color: #1d4ed8; }
-
-  /* 주문하기 버튼 50% */
-  .btn-submit-order {
-    width: 50%;
-    background-color: #2563eb;
-    color: white;
-    padding: 12px 0;
-    border-radius: 10px;
-    font-weight: 700;
-    font-size: 16px;
-    margin: 8px auto;
-    display: block;
-    cursor: pointer;
-  }
+  .btn-submit-order { width: 50%; background-color: #2563eb; color: white; padding: 12px 0; border-radius: 10px; font-weight: 700; font-size: 16px; margin: 8px auto; display: block; cursor: pointer; }
   .btn-submit-order:hover { background-color: #1d4ed8; }
+
+  /* [신규] 안내 이미지 모달 스타일 */
+  .info-modal { z-index: 9999; } /* 알림 모달보다 위에 뜨도록 */
+  .info-modal-content { position: relative; max-width: 95vw; max-height: 90vh; overflow: auto; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); background: transparent; }
+  .info-img { display: block; width: 100%; height: auto; max-width: 800px; /* 이미지가 너무 크면 제한 */ margin: 0 auto; }
+  .info-close-btn { position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; border: none; font-size: 24px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+  .info-close-btn:hover { background: rgba(0,0,0,0.8); }
 
   @media (max-width: 768px){
     body{ padding:16px; max-width:100%; }
@@ -110,13 +111,16 @@
         "url url url url url" "qty size discount notes notes"; }
     .btn-resp{ width:100%; }
     .note-text{ text-align:right; }
-    .btn-confirm, .btn-submit-order { width: 80%; } /* 모바일에서는 좀 더 넓게 */
+    .btn-confirm, .btn-submit-order { width: 80%; }
   }
 </style>
 </head>
 <body>
 
-<h1>공동구매 주문</h1>
+<header class="main-header">
+  <h1>공동구매 주문</h1>
+  <button type="button" id="btnHowTo" class="btn-link">주문방법</button>
+</header>
 
 <fieldset id="buyer_fieldset">
   <legend>주문자 정보</legend>
@@ -172,6 +176,13 @@
   </div>
 </div>
 
+<div id="infoModal" class="modal info-modal" role="dialog" aria-modal="true">
+  <div class="info-modal-content">
+    <button type="button" id="infoCloseBtn" class="info-close-btn" aria-label="닫기">&times;</button>
+    <img src="https://raw.githubusercontent.com/fitmora/groupbuy-form/90aae86d5e581e2013054c54435a4df8780d430b/howto.jpg" alt="주문방법 안내" class="info-img">
+  </div>
+</div>
+
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 
 <script>
@@ -223,20 +234,41 @@ function formatPhoneKR(d){
   return d.slice(0,11).replace(/(\d{3})(\d{4})(\d{4}).*/, '$1-$2-$3');
 }
 
-/* ===== 모달 로직 ===== */
+/* ===== 알림 모달 로직 ===== */
 const modal = $('#modal'), modalMsg = $('#modalMsg'), modalBtn = $('#modalBtn');
 let isSuccessAction = false; 
-
 function handleModalClick() {
   modal.classList.remove('open');
-  if (isSuccessAction) {
-    window.location.reload();
-  }
+  if (isSuccessAction) window.location.reload();
 }
 modalBtn.addEventListener('click', handleModalClick);
-document.addEventListener('keydown', (e)=>{ 
-  if(e.key==='Escape' && modal.classList.contains('open')) handleModalClick(); 
+
+/* ===== [신규] 주문방법 안내 모달 로직 ===== */
+const infoModal = $('#infoModal');
+const btnHowTo = $('#btnHowTo');
+const infoCloseBtn = $('#infoCloseBtn');
+
+// 열기
+btnHowTo.addEventListener('click', () => {
+  infoModal.classList.add('open');
 });
+// 닫기 (버튼 클릭)
+infoCloseBtn.addEventListener('click', () => {
+  infoModal.classList.remove('open');
+});
+// 닫기 (배경 클릭)
+infoModal.addEventListener('click', (e) => {
+  if (e.target === infoModal) infoModal.classList.remove('open');
+});
+
+// ESC 키 공통 처리
+document.addEventListener('keydown', (e)=>{ 
+  if(e.key==='Escape') {
+    if (infoModal.classList.contains('open')) infoModal.classList.remove('open');
+    else if (modal.classList.contains('open')) handleModalClick();
+  }
+});
+
 function openModalHTML(html, success = false){ 
   modalMsg.innerHTML = html; 
   modal.classList.add('open'); 
@@ -403,7 +435,7 @@ function enterReview(){
   btn.textContent = '주문 수정하기';
   $('#buyer_fieldset').style.opacity = .6;
   $('#items_fieldset').style.opacity = .6;
-  $$('input, select, button:not(#btn):not(#modalBtn):not(#confirmBtn)').forEach(el => el.disabled = true);
+  $$('input, select, button:not(#btn):not(#modalBtn):not(#confirmBtn):not(#btnHowTo):not(#infoCloseBtn)').forEach(el => el.disabled = true);
   showReviewHeader('주문 검토');
 }
 function enterEdit(){
@@ -435,11 +467,6 @@ function renderOrderCard(resp){
   const items = resp.groups?.[0]?.items || [];
 
   const rows = items.map(it => {
-    // [UI 표시용] 여기서도 브랜드명이 보이면 자를 수 있지만, 원본 데이터 보존을 위해 일단 그대로 둡니다.
-    // 만약 화면에서도 "온유어마크"를 빼고 싶다면 아래 코드를 활성화하세요.
-    // const cleanName = (it.name || '').replace(/^.*온유어마크[^|]*\|\s*/i, '').trim();
-    // const name = esc(cleanName || '(상품명 없음)');
-    
     const name = esc(it.name || '(상품명 없음)');
     const disc = (it.discount_mode === 'fixed') ? '고정' : (it.discount_rate ? `${it.discount_rate}%` : '0%');
     const price = Number(it.display_price ?? it.original_price ?? it.listed_price ?? 0);
@@ -486,14 +513,12 @@ function renderOrderCard(resp){
   $('#confirmBtn').addEventListener('click', submitFinal);
 }
 
-/* ===== [핵심] 최종 제출 (Submit) ===== */
+/* ===== 최종 제출 (Submit) ===== */
 async function submitFinal(){
   if (submitting) return;
 
-  // 1. 기본 입력값 가져오기
   const payload = buildPayload();
   
-  // 2. 검증된 상품 정보(이름, 가격 등) 합치기 + [상품명 브랜드 제거]
   if (lastValidated && lastValidated.groups && lastValidated.groups[0]) {
     const validItems = lastValidated.groups[0].items || [];
     
@@ -501,15 +526,14 @@ async function submitFinal(){
        payload.groups[0].items = payload.groups[0].items.map((it, i) => {
          const v = validItems[i];
          
-         // [NEW] 브랜드 접두사 제거 로직 (온유어마크 ... | )
+         // 브랜드 접두사 제거
          let rawName = v.name || '';
-         // 패턴: "온유어마크"로 시작하고 "|"가 나올 때까지의 모든 문자열을 제거
          let cleanName = rawName.replace(/^.*온유어마크[^|]*\|\s*/i, '').trim();
-         if (!cleanName) cleanName = rawName; // 만약 다 지워져버리면 원본 사용
+         if (!cleanName) cleanName = rawName;
 
          return {
            ...it, 
-           name: cleanName, // 정제된 이름 사용
+           name: cleanName,
            price: v.price,
            original_price: v.original_price,
            listed_price: v.listed_price,

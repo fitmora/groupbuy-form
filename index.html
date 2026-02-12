@@ -72,15 +72,13 @@
   
   .note-text{ text-align:center; margin-top:6px; }
 
-  /* [추가] 추천상품 리스트 스타일 */
-  .rec-box { margin-bottom: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
-  .rec-list { margin-top: 8px; max-height: 200px; overflow-y: auto; display: none; border-top: 1px dashed #cbd5e1; padding-top: 8px; }
-  .rec-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+  /* [추가] 상품 확인 섹션 스타일 */
+  .rec-list { margin-top: 10px; max-height: 250px; overflow-y: auto; display: none; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0 10px; background: #fff; }
+  .rec-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
   .rec-item:last-child { border-bottom: none; }
-  .rec-name { flex: 1; font-weight: 500; margin-right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .rec-actions { display: flex; gap: 6px; flex-shrink: 0; }
-  .btn-mini { padding: 4px 8px; font-size: 12px; border-radius: 6px; cursor: pointer; border: 1px solid #cbd5e1; background: white; color: #0a7cff; }
-  .btn-mini:hover { background: #f1f5f9; }
+  .rec-name { flex: 1; font-weight: 600; margin-right: 12px; }
+  .btn-mini { padding: 6px 12px; font-size: 13px; border-radius: 6px; cursor: pointer; border: 1px solid #cbd5e1; background: #f8fafc; color: #0a7cff; white-space: nowrap; font-weight: 500; }
+  .btn-mini:hover { background: #eff6ff; border-color: #bfdbfe; }
 
   /* 모달 */
   .modal{ position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; padding:16px; z-index:9990; }
@@ -203,6 +201,22 @@
   </div>
 </fieldset>
 
+<fieldset id="check_fieldset" style="background:#f0f9ff; border-color:#bae6fd;">
+  <legend style="color:#0284c7">상품 확인 (재고 확인용)</legend>
+  <div style="margin-bottom:8px; color:#475569; font-size:14px;">
+    아래 카테고리에서 상품을 선택하여 <b>재고를 먼저 확인</b>해 주세요.<br>
+    원하는 상품 페이지에서 <b>주소(URL)를 복사</b>하여 아래 '상품 정보' 란에 붙여넣어 주세요.
+  </div>
+  
+  <label for="recCategory">카테고리 선택</label>
+  <select id="recCategory" class="control">
+    <option value="">📂 카테고리를 선택하세요</option>
+  </select>
+  
+  <div id="recList" class="rec-list">
+    </div>
+</fieldset>
+
 <fieldset id="items_fieldset">
   <legend>상품 정보</legend>
   <div id="items"></div>
@@ -258,7 +272,7 @@ const RECOMMENDED_ITEMS = {
   ]
 };
 
-/* ===== DEBUG ===== */
+/* ===== DEBUG & UTIL ===== */
 const qs = new URLSearchParams(location.search);
 const STORAGE_OK = (() => { try { const k='__ls_test__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; } catch(e){ return false; } })();
 function lsGet(k){ if(!STORAGE_OK)return null; try{return localStorage.getItem(k);}catch(e){return null;} }
@@ -358,16 +372,10 @@ $('#buyer_phone').addEventListener('input', function() {
   this.value = formatPhoneKR(raw);
 });
 
-/* ===== 아이템 행 생성 (업그레이드: 추천상품 기능) ===== */
-function discountSelectHTML(){
-  const opts = DISCOUNT_OPTIONS.map(o => `<option value="${o.key}">${o.label}</option>`).join('');
-  return `<select name="discount_choice" class="control">${opts}</select>`;
-}
-
-// [추가] 추천상품 로직 바인딩 (사이트 이동만 가능)
-function bindRecommendation(rowEl) {
-  const catSel = rowEl.querySelector('.category-select');
-  const listDiv = rowEl.querySelector('.rec-list');
+/* ===== 추천상품 초기화 로직 (독립 실행) ===== */
+function initRecommendation() {
+  const catSel = document.getElementById('recCategory');
+  const listDiv = document.getElementById('recList');
 
   // 카테고리 옵션 채우기
   Object.keys(RECOMMENDED_ITEMS).forEach(cat => {
@@ -376,20 +384,16 @@ function bindRecommendation(rowEl) {
 
   catSel.addEventListener('change', () => {
     const cat = catSel.value;
-    listDiv.innerHTML = ''; // 초기화
+    listDiv.innerHTML = '';
     
     if (cat && RECOMMENDED_ITEMS[cat]) {
       listDiv.style.display = 'block';
       RECOMMENDED_ITEMS[cat].forEach(item => {
-        // 아이템 요소 생성
         const itemEl = document.createElement('div');
         itemEl.className = 'rec-item';
-        // [수정] 사이트 이동 버튼만 유지
         itemEl.innerHTML = `
-          <span class="rec-name" title="${item.name}">${item.name}</span>
-          <div class="rec-actions">
-            <button type="button" class="btn-mini link-btn">🔗 사이트 이동 (재고확인)</button>
-          </div>
+          <span class="rec-name">${item.name}</span>
+          <button type="button" class="btn-mini link-btn">🔗 사이트 이동</button>
         `;
         
         // 이동 버튼 클릭
@@ -405,6 +409,12 @@ function bindRecommendation(rowEl) {
   });
 }
 
+/* ===== 아이템 행 생성 (기존 유지) ===== */
+function discountSelectHTML(){
+  const opts = DISCOUNT_OPTIONS.map(o => `<option value="${o.key}">${o.label}</option>`).join('');
+  return `<select name="discount_choice" class="control">${opts}</select>`;
+}
+
 function createItemRow(idx){
   const el = document.createElement('div');
   el.className = 'item-box';
@@ -412,15 +422,8 @@ function createItemRow(idx){
   el.innerHTML = `
     <div class="item-grid">
       <div class="col-url">
-        <div class="rec-box">
-          <select class="control category-select" style="margin-bottom:0">
-            <option value="">📂 추천상품 카테고리 선택 (재고확인용)</option>
-          </select>
-          <div class="rec-list"></div>
-        </div>
-
         <label>상품 URL *</label>
-        <input name="product_url" class="control" type="url" placeholder="직접 URL 붙여넣기 (색상/사이즈 확인 후 복사)" required />
+        <input name="product_url" class="control" type="url" placeholder="https://··· 실제 상품 URL" required />
       </div>
       <div class="col-qty">
         <label>수량 *</label>
@@ -444,10 +447,6 @@ function createItemRow(idx){
       <span class="muted">필수: URL / 수량 / 사이즈 / 할인율</span>
     </div>
   `;
-  
-  // 기능 연결
-  bindRecommendation(el);
-
   el.querySelector('.remove').addEventListener('click', () => {
     if ($$('#items .item-box').length <= 1) return;
     el.remove(); refreshControls();
@@ -541,6 +540,7 @@ function enterReview(){
   btn.textContent = '주문 수정하기';
   $('#buyer_fieldset').style.opacity = .6;
   $('#items_fieldset').style.opacity = .6;
+  $('#check_fieldset').style.opacity = .6; /* [추가] 상품확인 섹션도 흐리게 */
   $$('input, select, button:not(#btn):not(#modalBtn):not(#confirmBtn):not(#btnHowTo):not(#infoCloseBtn)').forEach(el => el.disabled = true);
   showReviewHeader('주문 검토');
 }
@@ -549,6 +549,7 @@ function enterEdit(){
   btn.textContent = '주문 검토하기';
   $('#buyer_fieldset').style.opacity = 1;
   $('#items_fieldset').style.opacity = 1;
+  $('#check_fieldset').style.opacity = 1;
   $$('input, select, button').forEach(el => el.disabled = false);
   refreshControls();
   reviewHeader.style.display = 'none';
@@ -699,7 +700,10 @@ async function submitFinal(){
 }
 
 btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else doValidate(); });
-(function init(){ initItems(); })();
+(function init(){ 
+  initItems();
+  initRecommendation(); // 추천상품 로직 초기화
+})();
 </script>
 </body>
 </html>

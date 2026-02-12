@@ -1,3 +1,10 @@
+요청하신 대로 **[선택] 버튼은 제거**하고, **[사이트 이동] 버튼만 유지**하여 재고 확인 후 직접 URL을 복사해오도록 유도하는 방식을 적용했습니다.
+
+또한 카테고리는 **남성 러닝화 / 여성 러닝화 / 의류 / 기타 악세서리** 4가지로 고정했습니다.
+
+아래 코드를 전체 복사해서 `index.html` 파일에 그대로 덮어씌우시면 됩니다.
+
+```html
 <!doctype html>
 <html lang="ko">
 <head>
@@ -71,6 +78,16 @@
   }
   
   .note-text{ text-align:center; margin-top:6px; }
+
+  /* [추가] 추천상품 리스트 스타일 */
+  .rec-box { margin-bottom: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
+  .rec-list { margin-top: 8px; max-height: 200px; overflow-y: auto; display: none; border-top: 1px dashed #cbd5e1; padding-top: 8px; }
+  .rec-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+  .rec-item:last-child { border-bottom: none; }
+  .rec-name { flex: 1; font-weight: 500; margin-right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rec-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .btn-mini { padding: 4px 8px; font-size: 12px; border-radius: 6px; cursor: pointer; border: 1px solid #cbd5e1; background: white; color: #0a7cff; }
+  .btn-mini:hover { background: #f1f5f9; }
 
   /* 모달 */
   .modal{ position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; padding:16px; z-index:9990; }
@@ -231,6 +248,23 @@
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 
 <script>
+/* ===== 🛒 추천 상품 데이터 (여기만 수정하면 메뉴가 바뀝니다) ===== */
+const RECOMMENDED_ITEMS = {
+  "남성 러닝화": [
+    { name: "나이키 알파플라이 3 (예시)", url: "https://onyourmark-running.com/product/example1" },
+    { name: "아디다스 아디오스 프로 3 (예시)", url: "https://onyourmark-running.com/product/example2" },
+  ],
+  "여성 러닝화": [
+    { name: "나이키 베이퍼플라이 3 (여성)", url: "https://onyourmark-running.com/product/example4" },
+  ],
+  "의류": [
+    { name: "나이키 에어로스위프트 싱글렛", url: "https://onyourmark-running.com/product/example6" },
+  ],
+  "기타 악세서리": [
+    { name: "가민 포러너 965", url: "https://onyourmark-running.com/product/example8" },
+  ]
+};
+
 /* ===== DEBUG ===== */
 const qs = new URLSearchParams(location.search);
 const STORAGE_OK = (() => { try { const k='__ls_test__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; } catch(e){ return false; } })();
@@ -331,11 +365,53 @@ $('#buyer_phone').addEventListener('input', function() {
   this.value = formatPhoneKR(raw);
 });
 
-/* ===== 아이템 행 생성 ===== */
+/* ===== 아이템 행 생성 (업그레이드: 추천상품 기능) ===== */
 function discountSelectHTML(){
   const opts = DISCOUNT_OPTIONS.map(o => `<option value="${o.key}">${o.label}</option>`).join('');
   return `<select name="discount_choice" class="control">${opts}</select>`;
 }
+
+// [추가] 추천상품 로직 바인딩 (사이트 이동만 가능)
+function bindRecommendation(rowEl) {
+  const catSel = rowEl.querySelector('.category-select');
+  const listDiv = rowEl.querySelector('.rec-list');
+
+  // 카테고리 옵션 채우기
+  Object.keys(RECOMMENDED_ITEMS).forEach(cat => {
+    catSel.innerHTML += `<option value="${cat}">${cat}</option>`;
+  });
+
+  catSel.addEventListener('change', () => {
+    const cat = catSel.value;
+    listDiv.innerHTML = ''; // 초기화
+    
+    if (cat && RECOMMENDED_ITEMS[cat]) {
+      listDiv.style.display = 'block';
+      RECOMMENDED_ITEMS[cat].forEach(item => {
+        // 아이템 요소 생성
+        const itemEl = document.createElement('div');
+        itemEl.className = 'rec-item';
+        // [수정] 사이트 이동 버튼만 유지
+        itemEl.innerHTML = `
+          <span class="rec-name" title="${item.name}">${item.name}</span>
+          <div class="rec-actions">
+            <button type="button" class="btn-mini link-btn">🔗 사이트 이동 (재고확인)</button>
+          </div>
+        `;
+        
+        // 이동 버튼 클릭
+        itemEl.querySelector('.link-btn').addEventListener('click', () => {
+          window.open(item.url, '_blank');
+        });
+        
+        listDiv.appendChild(itemEl);
+      });
+    } else {
+      listDiv.style.display = 'none';
+    }
+  });
+}
+
 function createItemRow(idx){
   const el = document.createElement('div');
   el.className = 'item-box';
@@ -343,8 +419,15 @@ function createItemRow(idx){
   el.innerHTML = `
     <div class="item-grid">
       <div class="col-url">
+        <div class="rec-box">
+          <select class="control category-select" style="margin-bottom:0">
+            <option value="">📂 추천상품 카테고리 선택 (재고확인용)</option>
+          </select>
+          <div class="rec-list"></div>
+        </div>
+
         <label>상품 URL *</label>
-        <input name="product_url" class="control" type="url" placeholder="https://··· 실제 상품 URL" required />
+        <input name="product_url" class="control" type="url" placeholder="직접 URL 붙여넣기 (색상/사이즈 확인 후 복사)" required />
       </div>
       <div class="col-qty">
         <label>수량 *</label>
@@ -368,6 +451,10 @@ function createItemRow(idx){
       <span class="muted">필수: URL / 수량 / 사이즈 / 할인율</span>
     </div>
   `;
+  
+  // 기능 연결
+  bindRecommendation(el);
+
   el.querySelector('.remove').addEventListener('click', () => {
     if ($$('#items .item-box').length <= 1) return;
     el.remove(); refreshControls();
@@ -623,3 +710,5 @@ btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else d
 </script>
 </body>
 </html>
+
+```

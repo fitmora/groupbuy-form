@@ -25,6 +25,9 @@
     background-position:right 12px top 50%, right 18px top 50%;
     background-size:6px 6px; background-repeat:no-repeat;
   }
+  
+  /* 읽기 전용 인풋 스타일 */
+  input[readonly].control { background-color: #f1f5f9; color: #64748b; cursor: default; border-color: #e2e8f0; }
 
   .row-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px }
   .flex{ display:flex; gap:10px; align-items:center }
@@ -63,12 +66,7 @@
   .debug-on .debug{ display:block; }
   .btn-wrap{ display:flex; justify-content:center; margin-top: 16px; }
   
-  /* [수정] PC/태블릿에서 버튼 크기 33.333%로 정확히 고정 */
-  .btn-resp { 
-    width: 33.333%; 
-    min-width: 200px; /* 너무 작아지는 것 방지 */
-    flex-shrink: 0;   /* flex 컨테이너 안에서 줄어들지 않도록 고정 */
-  }
+  .btn-resp { width: 33.333%; min-width: 200px; flex-shrink: 0; }
   
   .note-text{ text-align:center; margin-top:6px; }
 
@@ -112,9 +110,7 @@
         "notes notes notes";
     }
 
-    /* 모바일에서는 버튼 100% 꽉 차게 */
     .btn-resp{ width:100%; }
-    
     .note-text{ text-align:right; }
     .btn-confirm, .btn-submit-order { width: 80%; }
 
@@ -126,43 +122,11 @@
     .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
     .table thead { display: none; }
     
-    .table tr {
-      margin-bottom: 15px;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 12px;
-      background: #fff;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    
-    .table td {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      text-align: right;
-      padding: 8px 0;
-      border-bottom: 1px dashed #f1f5f9;
-      font-size: 14px;
-    }
+    .table tr { margin-bottom: 15px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .table td { display: flex; justify-content: space-between; align-items: center; text-align: right; padding: 8px 0; border-bottom: 1px dashed #f1f5f9; font-size: 14px; }
     .table td:last-child { border-bottom: none; }
-
-    .table td:first-child {
-      display: block;
-      text-align: left;
-      font-weight: 700;
-      font-size: 16px;
-      color: #1e293b;
-      border-bottom: 2px solid #e2e8f0;
-      padding-bottom: 10px;
-      margin-bottom: 6px;
-    }
-
-    .table td::before {
-      content: attr(data-label);
-      font-weight: 600;
-      color: #64748b;
-      margin-right: auto;
-    }
+    .table td:first-child { display: block; text-align: left; font-weight: 700; font-size: 16px; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 6px; }
+    .table td::before { content: attr(data-label); font-weight: 600; color: #64748b; margin-right: auto; }
     .table td:first-child::before { display: none; }
   }
 </style>
@@ -202,7 +166,7 @@
 </fieldset>
 
 <fieldset id="check_fieldset" style="background:#f0f9ff; border-color:#bae6fd;">
-  <legend style="color:#0284c7">상품 확인</legend>
+  <legend style="color:#0284c7">상품 확인 (재고 확인용)</legend>
   <div style="margin-bottom:8px; color:#475569; font-size:14px;">
     아래 카테고리에서 상품을 선택하여 <b>재고를 먼저 확인</b>해 주세요.<br>
     원하는 상품 페이지에서 <b>주소(URL)를 복사</b>하여 아래 '상품 정보' 란에 붙여넣어 주세요.
@@ -213,8 +177,7 @@
     <option value="">📂 카테고리를 선택하세요</option>
   </select>
   
-  <div id="recList" class="rec-list">
-    </div>
+  <div id="recList" class="rec-list"></div>
 </fieldset>
 
 <fieldset id="items_fieldset">
@@ -229,7 +192,7 @@
 <div class="btn-wrap" style="margin-bottom:4px">
   <button id="btn" type="button" class="btn-resp">주문 검토하기</button>
 </div>
-<div class="muted note-text">검토 후 주문 정보가 표시됩니다.</div>
+<div class="muted note-text">검토 후 상품명과 할인율이 자동 적용됩니다.</div>
 
 <h3 id="reviewHeader" style="display:none">주문 결과</h3>
 <div id="result" class="result"></div>
@@ -255,21 +218,34 @@
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 
 <script>
-/* ===== 🛒 추천 상품 데이터 (여기만 수정하면 메뉴가 바뀝니다) ===== */
+/* ===== 🛠️ [설정 1] 추천 상품 데이터 (재고 확인용) ===== */
 const RECOMMENDED_ITEMS = {
-  "남성": [
-    { name: "러닝화", url: "https://onyourmark-running.com/category/Footwear/29/" },
-    { name: "의류", url: "https://onyourmark-running.com/category/Apparel/30/" },
+  "남성 러닝화": [
+    { name: "나이키 알파플라이 3 (예시)", url: "https://onyourmark-running.com/product/example1" },
+    { name: "아디다스 아디오스 프로 3 (예시)", url: "https://onyourmark-running.com/product/example2" },
   ],
-  "여성": [
-    { name: "러닝화", url: "https://onyourmark-running.com/category/Footwear/32/" },
-    { name: "의류", url: "https://onyourmark-running.com/category/Apparel/33/" },
+  "여성 러닝화": [
+    { name: "나이키 베이퍼플라이 3 (여성)", url: "https://onyourmark-running.com/product/example4" },
   ],
-  "기타 액세서리": [
-    { name: "모자/양말 외", url: "https://onyourmark-running.com/category/Gear/26/" },
+  "의류": [
+    { name: "나이키 에어로스위프트 싱글렛", url: "https://onyourmark-running.com/product/example6" },
   ],
   "기타 악세서리": [
     { name: "가민 포러너 965", url: "https://onyourmark-running.com/product/example8" },
+  ]
+};
+
+/* ===== 🛠️ [설정 2] 자동 할인 규칙 (여기서 할인율을 설정하세요) ===== */
+// 상품명 또는 SKU에 포함된 단어를 기준으로 할인율(%)을 적용합니다.
+const AUTO_DISCOUNT_RULES = {
+  default: 0, // 기본 할인율 (조건 안 맞을 때)
+  rules: [
+    // { keyword: "찾을단어", rate: 할인율숫자 },
+    { keyword: "알파플라이", rate: 10 },    // 상품명에 '알파플라이'가 있으면 10%
+    { keyword: "베이퍼플라이", rate: 15 },  // 15%
+    { keyword: "JP9193", rate: 20 },      // 특정 SKU(상품코드) 할인
+    { keyword: "의류", rate: 5 },         // '의류' 카테고리 등
+    { keyword: "싱글렛", rate: 5 },
   ]
 };
 
@@ -288,15 +264,6 @@ document.addEventListener('keydown', (e)=>{ if(!e.altKey)return; if(e.code==='Ke
 const VALIDATE_URL = "https://primary-production-97a64.up.railway.app/webhook/groupbuy/validate";
 const SUBMIT_URL   = "https://primary-production-97a64.up.railway.app/webhook/internal-order-feed";
 const ADMIN_EMAIL  = "elvina79@gmail.com";
-
-const DISCOUNT_OPTIONS = [
-  { key:'',    label:'선택',         mode:null,     value:null },
-  { key:'p10', label:'10%',         mode:'percent', value:10 },
-  { key:'p20', label:'20%',         mode:'percent', value:20 },
-  { key:'p30', label:'30%',         mode:'percent', value:30 },
-  { key:'p40', label:'40%',         mode:'percent', value:40 },
-  { key:'f230',label:'고정 230,000', mode:'fixed',   value:230000 },
-];
 
 /* ===== Dom & Utils ===== */
 const $  = s => document.querySelector(s);
@@ -373,12 +340,11 @@ $('#buyer_phone').addEventListener('input', function() {
   this.value = formatPhoneKR(raw);
 });
 
-/* ===== 추천상품 초기화 로직 (독립 실행) ===== */
+/* ===== 추천상품 초기화 로직 ===== */
 function initRecommendation() {
   const catSel = document.getElementById('recCategory');
   const listDiv = document.getElementById('recList');
 
-  // 카테고리 옵션 채우기
   Object.keys(RECOMMENDED_ITEMS).forEach(cat => {
     catSel.innerHTML += `<option value="${cat}">${cat}</option>`;
   });
@@ -396,12 +362,9 @@ function initRecommendation() {
           <span class="rec-name">${item.name}</span>
           <button type="button" class="btn-mini link-btn">🔗 사이트 이동</button>
         `;
-        
-        // 이동 버튼 클릭
         itemEl.querySelector('.link-btn').addEventListener('click', () => {
           window.open(item.url, '_blank');
         });
-        
         listDiv.appendChild(itemEl);
       });
     } else {
@@ -410,12 +373,7 @@ function initRecommendation() {
   });
 }
 
-/* ===== 아이템 행 생성 (기존 유지) ===== */
-function discountSelectHTML(){
-  const opts = DISCOUNT_OPTIONS.map(o => `<option value="${o.key}">${o.label}</option>`).join('');
-  return `<select name="discount_choice" class="control">${opts}</select>`;
-}
-
+/* ===== 아이템 행 생성 (드롭다운 제거, 자동적용 표시) ===== */
 function createItemRow(idx){
   const el = document.createElement('div');
   el.className = 'item-box';
@@ -435,8 +393,8 @@ function createItemRow(idx){
         <input name="size" class="control" type="text" placeholder="예: 285 / 100" />
       </div>
       <div class="col-discount">
-        <label>할인율 *</label>
-        ${discountSelectHTML()}
+        <label>할인율 (자동)</label>
+        <input type="text" class="control" name="discount_display" value="자동적용" readonly />
       </div>
       <div class="col-notes">
         <label>요청/참고사항</label>
@@ -445,7 +403,7 @@ function createItemRow(idx){
     </div>
     <div class="flex" style="margin-top:8px">
       <button type="button" class="btn-ghost remove">– 제거</button>
-      <span class="muted">필수: URL / 수량 / 사이즈 / 할인율</span>
+      <span class="muted">필수: URL / 수량 / 사이즈</span>
     </div>
   `;
   el.querySelector('.remove').addEventListener('click', () => {
@@ -470,7 +428,7 @@ addItemBtn.addEventListener('click', () => {
   refreshControls();
 });
 
-/* ===== 페이로드 생성/검증 ===== */
+/* ===== 페이로드 생성 (자동할인 전송용) ===== */
 function buildPayload(){
   const buyer = {
     name:   $('#buyer_name').value.trim(),
@@ -478,19 +436,16 @@ function buildPayload(){
     email:  $('#buyer_email').value.trim(),
     address:$('#buyer_addr').value.trim(),
   };
+  // 자동 할인은 검토 단계 후에 결정되므로 초기값은 null로 보냅니다.
   const items = $$('#items .item-box').map(box => {
     const $q = s => box.querySelector(s);
-    const choiceKey = ($q('select[name="discount_choice"]').value || '').trim();
-    const choice = DISCOUNT_OPTIONS.find(o => o.key === choiceKey) || {mode:null, value:null};
     return {
       product_url: ($q('input[name="product_url"]').value || '').trim(),
       qty: Number($q('input[name="qty"]').value || 1),
       size: ($q('input[name="size"]').value || '').trim(),
       notes: ($q('input[name="notes"]').value || '').trim(),
-      discount_mode: choice.mode,
-      discount_value: choice.value == null ? null : Number(choice.value),
-      discount_rate: choice.mode === 'percent' ? Number(choice.value) : null,
-      fixed_price:   choice.mode === 'fixed'   ? Number(choice.value) : null,
+      discount_mode: null, 
+      discount_value: null
     };
   });
   return { groups: [{ ...buyer, items }] };
@@ -503,9 +458,59 @@ function validateRequired(payload){
   for(let i=0; i<g.items.length; i++){
     const it = g.items[i];
     if(!/^https?:\/\//i.test(it.product_url)) return { ok:false, msg:`#${i+1} 상품 URL을 확인해 주세요.` };
-    if(!it.discount_mode) return { ok:false, msg:`#${i+1} 할인 항목을 선택해 주세요.` };
   }
   return { ok:true };
+}
+
+/* ===== [핵심] 자동 할인 적용 로직 ===== */
+function applyAutoDiscounts(data) {
+  if (!data || !data.groups || !data.groups[0] || !data.groups[0].items) return;
+  
+  const items = data.groups[0].items;
+  let itemsTotal = 0;
+  let totalQty = 0;
+
+  items.forEach(item => {
+    // 1. 할인율 결정
+    let rate = AUTO_DISCOUNT_RULES.default;
+    const searchText = (item.name || '') + ' ' + (item.sku || '');
+    
+    for (const rule of AUTO_DISCOUNT_RULES.rules) {
+      if (searchText.includes(rule.keyword)) {
+        rate = rule.rate;
+        break; // 첫 번째 매칭되는 규칙 적용
+      }
+    }
+
+    // 2. 가격 재계산
+    const unitPrice = item.price || item.display_price || 0;
+    const discountAmount = unitPrice * (rate / 100);
+    const finalUnitPrice = unitPrice - discountAmount;
+    
+    // 데이터 갱신
+    item.discount_mode = 'percent';
+    item.discount_rate = rate;
+    item.total = finalUnitPrice * item.qty;
+    
+    itemsTotal += item.total;
+    totalQty += item.qty;
+  });
+
+  // 3. 배송비 및 총액 재계산 (3개당 3500원 규칙)
+  const shippingCount = Math.floor(totalQty / 3);
+  const shippingTotal = (totalQty % 3 === 0 && totalQty > 0) 
+                        ? (Math.floor((totalQty - 1)/3) + 1) * 3500 
+                        : Math.ceil(totalQty / 3) * 3500;
+  
+  // (참고: 기존 n8n 배송비 로직을 프론트에서 단순화하여 적용. n8n 로직과 일치시킴)
+  // 여기서는 n8n이 보내준 shipping_total을 그대로 쓸 수 없으므로(할인이 적용되면 총액이 바뀌니)
+  // 배송비는 수량 기반이므로 n8n 값을 신뢰하되, 총액만 다시 더함.
+  
+  // 하지만 안전하게 n8n에서 온 shipping_total을 쓰겠습니다 (수량은 안 변했으니까)
+  const serverShipping = data.summary.shipping_total || 0;
+  
+  data.summary.items_total = itemsTotal;
+  data.summary.grand_total = itemsTotal + serverShipping;
 }
 
 /* ===== 검토/전송 ===== */
@@ -514,7 +519,7 @@ async function doValidate(){
   const vReq = validateRequired(payload);
   if (!vReq.ok) { alert(vReq.msg); return; }
 
-  out.textContent = '검토 요청 중…';
+  out.textContent = '상품 정보 확인 중…';
   btn.disabled = true;
   try{
     const res = await fetch(VALIDATE_URL, {
@@ -525,6 +530,9 @@ async function doValidate(){
     const data = await res.json().catch(()=>null);
     if(!data){ throw new Error('No JSON response'); }
     
+    // [중요] 받아온 데이터에 자동 할인 로직 적용!
+    applyAutoDiscounts(data);
+
     lastValidated = data;
     renderOrderCard(data);
     enterReview();
@@ -541,9 +549,9 @@ function enterReview(){
   btn.textContent = '주문 수정하기';
   $('#buyer_fieldset').style.opacity = .6;
   $('#items_fieldset').style.opacity = .6;
-  $('#check_fieldset').style.opacity = .6; /* [추가] 상품확인 섹션도 흐리게 */
+  $('#check_fieldset').style.opacity = .6;
   $$('input, select, button:not(#btn):not(#modalBtn):not(#confirmBtn):not(#btnHowTo):not(#infoCloseBtn)').forEach(el => el.disabled = true);
-  showReviewHeader('주문 검토');
+  showReviewHeader('주문 검토 (자동할인 적용됨)');
 }
 function enterEdit(){
   mode = 'edit';
@@ -576,8 +584,9 @@ function renderOrderCard(resp){
 
   const rows = items.map(it => {
     const name = esc(it.name || '(상품명 없음)');
+    // 자동 적용된 할인율 표시
     const disc = (it.discount_mode === 'fixed') ? '고정' : (it.discount_rate ? `${it.discount_rate}%` : '0%');
-    const price = Number(it.display_price ?? it.original_price ?? it.listed_price ?? 0);
+    const price = Number(it.price || it.display_price || 0);
     return `
       <tr>
         <td>
@@ -585,7 +594,7 @@ function renderOrderCard(resp){
           <div class="subtle"><a href="${esc(it.product_url)}" target="_blank" class="url">상품 페이지 열기</a> · 사이즈: ${esc(it.size)}${it.notes?` · 메모: ${esc(it.notes)}`:''}</div>
         </td>
         <td data-label="가격">${krw(price)}</td>
-        <td data-label="할인율">${disc}</td>
+        <td data-label="할인율"><span style="color:#e11d48; font-weight:bold">${disc}</span></td>
         <td data-label="수량">${it.qty}</td>
         <td data-label="소계" style="text-align:right; font-weight:bold">${krw(it.total)}</td>
       </tr>`;
@@ -624,11 +633,14 @@ function renderOrderCard(resp){
 async function submitFinal(){
   if (submitting) return;
 
+  // [수정] buildPayload는 Form 값을 읽지만, 
+  // 실제로는 lastValidated(자동할인이 적용된 데이터)를 서버로 보내야 정확합니다.
   const payload = buildPayload();
   
   if (lastValidated && lastValidated.groups && lastValidated.groups[0]) {
     const validItems = lastValidated.groups[0].items || [];
     
+    // 폼에 있는 아이템과 검증된 아이템 개수가 같으면, 검증된(할인적용된) 데이터를 사용
     if (payload.groups[0].items.length === validItems.length) {
        payload.groups[0].items = payload.groups[0].items.map((it, i) => {
          const v = validItems[i];
@@ -640,10 +652,13 @@ async function submitFinal(){
          return {
            ...it, 
            name: cleanName,
-           price: v.price,
-           original_price: v.original_price,
-           listed_price: v.listed_price,
+           price: v.price, // 원래가격
            display_price: v.display_price,
+           
+           // [중요] 자동계산된 할인 정보 강제 적용
+           discount_mode: v.discount_mode,
+           discount_rate: v.discount_rate,
+           discount_value: v.discount_value,
            total: v.total
          };
        });
@@ -703,7 +718,7 @@ async function submitFinal(){
 btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else doValidate(); });
 (function init(){ 
   initItems();
-  initRecommendation(); // 추천상품 로직 초기화
+  initRecommendation(); 
 })();
 </script>
 </body>

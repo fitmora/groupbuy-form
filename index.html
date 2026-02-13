@@ -262,8 +262,10 @@
 </div> 
 
 <div id="noticeModal" class="modal info-modal" role="dialog" aria-modal="true">
-  <div class="modal-card" style="max-width: 800px;"> <div class="modal-head">📢 공동구매 필독 공지사항</div>
-    <div class="modal-body" style="text-align: left; font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #111; max-height: 70vh; overflow-y: auto; padding: 20px;">
+  <div class="info-modal-content" style="background: #fff; padding: 24px; max-width: 600px;">
+    <button type="button" id="noticeCloseBtn" class="info-close-btn" aria-label="닫기">&times;</button>
+    <div style="text-align: left; font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #111;">
+      <h2 style="text-align: center; margin-bottom: 20px;">📦 📢 공동구매 필독 공지사항</h2>
 공구 안내입니다. 
 내용을 정확히 숙지하시고 진행해주세요. 
 
@@ -287,7 +289,8 @@
 
 <b>3. 제품은 2월 20일 (금요일) 일괄 발송합니다.</b>
 
-<b>4. 제품 및 기타 문의는 우측 하단의 버튼을 클릭하여 채팅방을 이용해주시고, 부득이한 상황을 제외하고 개인 카톡은 자제 부탁드립니다.</b>
+<b>4. 제품 및 일반 문의</b>
+: 우측 하단의 버튼을 클릭하여 채팅방을 이용해주시고, 부득이한 상황을 제외하고 개인 카톡은 자제 부탁드립니다.
 
 <b>5. 교환 및 환불</b>
 - 하단의 '교환 및 반품 요청 양식'을 작성, 문자를 통해 담당자에게 직접 접수를 하셔야 합니다.
@@ -326,9 +329,6 @@
 : 공구는 목마교 회원분들과 혜택을 공유하는 차원에서 진행하고 있습니다. 브랜드 본사와 할인 판매에 대한 문제가 발생할 수 있으니, 보안을 당부를 드리며, 개별 현금영수증 발행은 어려운 점 양해 부탁드립니다. 
 
 감사합니다.
-    </div>
-    <div class="modal-actions">
-      <button type="button" onclick="document.getElementById('noticeModal').classList.remove('open')" class="btn-confirm" style="width: 100%;">닫기</button>
     </div>
   </div>
 </div>

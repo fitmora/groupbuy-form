@@ -262,10 +262,9 @@
 </div> 
 
 <div id="noticeModal" class="modal info-modal" role="dialog" aria-modal="true">
-  <div class="info-modal-content" style="background: #fff; padding: 24px; max-width: 600px;">
-    <button type="button" id="noticeCloseBtn" class="info-close-btn" aria-label="닫기">&times;</button>
-    <div style="text-align: left; font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #111;">
-      <h2 style="text-align: center; margin-bottom: 20px;">📦 공동구매 안내문</h2>
+  <div class="modal-card" style="max-width: 800px;"> <div class="modal-head">📢공지사항</div>
+    <button type="button" id="noticeCloseBtn" class="info-close-btn" style="top: 8px; right: 12px;">&times;</button>
+    <div class="modal-body" style="text-align: left; font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #111; max-height: 70vh; overflow-y: auto; padding: 20px;">
 공구 안내입니다. 
 내용을 정확히 숙지하시고 진행해주세요. 
 
@@ -325,6 +324,9 @@
 내용 : 어느쪽 발인지 표기, 내용 상세하게 작성
 사진 첨부 : 선택 사항이며, 필요시 요청드릴 수 있습니다.
 ——————————————————————————
+    </div>
+    <div class="modal-actions">
+      <button type="button" onclick="document.getElementById('noticeModal').classList.remove('open')" class="btn-confirm" style="width: 100%;">닫기</button>
     </div>
   </div>
 </div>

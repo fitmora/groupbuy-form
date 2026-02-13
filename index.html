@@ -419,6 +419,14 @@ function handleModalClick() {
 }
 modalBtn.addEventListener('click', handleModalClick);
 
+/* ===== 공지사항 팝업 제어 ===== */
+const noticeModal = $('#noticeModal');
+const btnNotice = $('#btnNotice');
+const noticeCloseBtn = $('#noticeCloseBtn');
+btnNotice.addEventListener('click', () => { noticeModal.classList.add('open'); });
+noticeCloseBtn.addEventListener('click', () => { noticeModal.classList.remove('open'); });
+noticeModal.addEventListener('click', (e) => { if (e.target === noticeModal) noticeModal.classList.remove('open'); });
+  
 const infoModal = $('#infoModal');
 const btnHowTo = $('#btnHowTo');
 const infoCloseBtn = $('#infoCloseBtn');

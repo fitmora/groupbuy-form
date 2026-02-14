@@ -295,8 +295,7 @@
 * <b>디나엘 4 사전판매</b> (민트 색상으로 링크 제품과 색상이 다르니 주의하세요)
 <img src="https://images.puma.com/image/upload/f_auto,q_auto,b_rgb:fafafa,w_1200,h_1200/global/312127/03/sv02/fnd/PNA/fmt/png/Deviate-NITRO%E2%84%A2-Elite-4-Men's-Road-Running-Shoes" 
      style="width: 100%; max-width: 400px; display: block; margin: 10px 0; border-radius: 8px; border: 1px solid #eee;">
-- 주문 가능 사이즈 : 235~290
-- 주문 가능 사이즈 : 235~290
+- 주문 가능 사이즈 : 235~250(여성), 250~290(남성)
 - 상품확인의 카테고리에서 ‘사전구매’ 선택 후 연결되는 링크를 복사하여 주문합니다. '요청/참고사항'란에 ‘사전구매 확인’을 적어주세요.
 - 배송은 3월 첫째주 예정이라고 합니다.
 - 사전구매 + 일반 제품 함께 주문 시 추가 배송비 3,500원 발생합니다.
@@ -363,8 +362,17 @@
 
 <script>
 
-/* ===== 🔒 n8n 실시간 인증번호 연동 ===== */
+/* ===== 🔒 n8n 실시간 인증번호 연동 (세션 유지 추가) ===== */
 const AUTH_URL = "https://primary-production-97a64.up.railway.app/webhook/member-auth"; 
+
+// 인증 성공 시 공통 처리 함수 (추가됨)
+function handleAuthSuccess(name) {
+  document.getElementById('auth_gate').style.display = 'none';
+  document.getElementById('main_app').style.display = 'block';
+  document.getElementById('buyer_name').value = name;
+  // 세션 저장을 위해 localStorage에 기록 (추가됨)
+  localStorage.setItem('mokmagyo_session', JSON.stringify({ name: name, time: Date.now() }));
+}
 
 document.getElementById('auth_btn').addEventListener('click', async () => {
   const nameInput = document.getElementById('auth_name');
@@ -396,10 +404,8 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
     const result = await response.json();
 
     if (result.allowed) {
-      // ✅ 성공: 게이트 닫기 및 메인 앱 보이기
-      document.getElementById('auth_gate').style.display = 'none';
-      document.getElementById('main_app').style.display = 'block'; // (추가됨)
-      document.getElementById('buyer_name').value = name;
+      // ✅ 성공 호출
+      handleAuthSuccess(name);
     } else {
       // ❌ 실패: n8n에서 보내준 실패 메시지 표시
       msgArea.textContent = result.msg || "등록된 정보가 일치하지 않습니다.";
@@ -884,9 +890,22 @@ async function submitFinal(){
 }
 
 btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else doValidate(); });
+
 (function init(){ 
   initItems();
   initRecommendation(); // 추천상품 로직 초기화
+
+  // [추가됨] 페이지 로드 시 기존 인증 정보 확인 (localStorage 체크)
+  const saved = localStorage.getItem('mokmagyo_session');
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      // 24시간 이내 인증만 유효하게 설정 (원치 않으시면 시간 체크 빼셔도 됩니다)
+      if (Date.now() - data.time < 24 * 60 * 60 * 1000) {
+        handleAuthSuccess(data.name);
+      }
+    } catch(e) { localStorage.removeItem('mokmagyo_session'); }
+  }
 })();
 </script>
 

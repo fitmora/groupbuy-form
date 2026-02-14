@@ -343,6 +343,52 @@
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 
 <script>
+
+/* ===== 🔒 n8n 실시간 회원 인증 연동 ===== */
+const AUTH_URL = "https://여기에_생성된_웹훅_주소_입력/member-auth"; 
+
+document.getElementById('auth_btn').addEventListener('click', async () => {
+  const nameInput = document.getElementById('auth_name');
+  const phoneInput = document.getElementById('auth_phone');
+  const msgArea = document.getElementById('auth_msg');
+  const btnEl = document.getElementById('auth_btn');
+
+  const name = nameInput.value.trim();
+  const phone = phoneInput.value.replace(/[^0-9]/g, ''); // 숫자만 추출
+
+  if(!name || !phone) { alert("회원명과 연락처를 입력해 주세요."); return; }
+
+  btnEl.disabled = true;
+  btnEl.textContent = "인증 중...";
+  msgArea.style.display = 'none';
+
+  try {
+    const response = await fetch(AUTH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, phone })
+    });
+    
+    const result = await response.json();
+
+    if (result.allowed) {
+      // ✅ 성공: 게이트 닫고 이름/번호 자동 세팅
+      document.getElementById('auth_gate').style.display = 'none';
+      document.getElementById('buyer_name').value = name;
+      document.getElementById('buyer_phone').value = formatPhoneKR(phone);
+    } else {
+      // ❌ 실패
+      msgArea.textContent = result.msg;
+      msgArea.style.display = 'block';
+    }
+  } catch (err) {
+    alert("서버 연결 실패. 네트워크를 확인해 주세요.");
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = "입장하기";
+  }
+});
+  
 /* ===== 🛒 추천 상품 데이터 (여기만 수정하면 메뉴가 바뀝니다) ===== */
 const RECOMMENDED_ITEMS = {
   "사전구매": [

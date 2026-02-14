@@ -3,180 +3,180 @@
 <head>
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://fitmora.github.io/groupbuy-form/">
-<meta property="og:title" content="공동구매 주문"> 
-<meta property="og:description" content="공동구매를 진행합니다.">  
+<meta property="og:title" content="공동구매 주문"> 
+<meta property="og:description" content="공동구매를 진행합니다.">  
 <meta property="og:image" content="https://onyourmark-running.com/web/product/big/202601/998e453391442829c3d76408b5893829.jpg">
-  
+  
 <meta charset="utf-8" />
 <title>공동구매 주문</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
-  :root{ --bg:#fafafa;--card:#fff;--bd:#e5e7eb;--muted:#64748b;--em:#0a7cff; --control-h:44px; }
-  *{ box-sizing:border-box }
-  body{ font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; padding:24px; max-width:960px; margin:auto; background:var(--bg); color:#111; }
-  h1{ font-size:22px; margin:0 0 10px }
+  :root{ --bg:#fafafa;--card:#fff;--bd:#e5e7eb;--muted:#64748b;--em:#0a7cff; --control-h:44px; }
+  *{ box-sizing:border-box }
+  body{ font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; padding:24px; max-width:960px; margin:auto; background:var(--bg); color:#111; }
+  h1{ font-size:22px; margin:0 0 10px }
 
-  .btn-link { background:none; border:none; color:var(--em); cursor:pointer; font-weight:600; font-size:14px; padding:4px 0; text-decoration:none; }
-  .btn-link:hover { text-decoration:underline; }
+  .btn-link { background:none; border:none; color:var(--em); cursor:pointer; font-weight:600; font-size:14px; padding:4px 0; text-decoration:none; }
+  .btn-link:hover { text-decoration:underline; }
 
-  fieldset{ border:1px solid var(--bd); border-radius:12px; padding:16px; margin:16px 0; background:var(--card) }
-  legend{ padding:0 6px; color:#334155; font-weight:700 }
-  label{ display:block; margin:10px 0 6px; font-weight:600 }
+  fieldset{ border:1px solid var(--bd); border-radius:12px; padding:16px; margin:16px 0; background:var(--card) }
+  legend{ padding:0 6px; color:#334155; font-weight:700 }
+  label{ display:block; margin:10px 0 6px; font-weight:600 }
 
-  .control{ width:100%; height:var(--control-h); padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; line-height:calc(var(--control-h) - 22px); font-size:16px; appearance:none; }
-  input[type="number"].control{ appearance:auto; }
-  select.control{
-    padding-right:28px;
-    background-image:linear-gradient(45deg,transparent 50%,#94a3b8 50%),linear-gradient(135deg,#94a3b8 50%,transparent 50%);
-    background-position:right 12px top 50%, right 18px top 50%;
-    background-size:6px 6px; background-repeat:no-repeat;
-  }
+  .control{ width:100%; height:var(--control-h); padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; line-height:calc(var(--control-h) - 22px); font-size:16px; appearance:none; }
+  input[type="number"].control{ appearance:auto; }
+  select.control{
+    padding-right:28px;
+    background-image:linear-gradient(45deg,transparent 50%,#94a3b8 50%),linear-gradient(135deg,#94a3b8 50%,transparent 50%);
+    background-position:right 12px top 50%, right 18px top 50%;
+    background-size:6px 6px; background-repeat:no-repeat;
+  }
 
-  .row-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px }
-  .flex{ display:flex; gap:10px; align-items:center }
-  .right{ margin-left:auto }
-  .muted{ color:#64748b; font-size:14px }
-  .hint{ font-size:12px; color:#475569 }
-  
-  button{ padding:12px 16px; border:0; border-radius:10px; background:var(--em); color:#fff; font-weight:700; cursor:pointer }
-  button:disabled{ opacity:.5; cursor:not-allowed }
-  .btn-ghost{ background:#f1f5f9; color:#0f172a }
-  
-  .card{ border:1px solid var(--bd); border-radius:12px; padding:16px; margin:16px 0; background:var(--card); box-shadow:0 2px 8px rgba(0,0,0,.05); max-width:960px }
-  .card h3{ margin:0 0 12px; font-size:18px }
-  .row2{ display:flex; justify-content:space-between; gap:12px; margin:6px 0 }
-  .hr{ height:1px; background:#e5e7eb; margin:10px 0 }
+  .row-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px }
+  .flex{ display:flex; gap:10px; align-items:center }
+  .right{ margin-left:auto }
+  .muted{ color:#64748b; font-size:14px }
+  .hint{ font-size:12px; color:#475569 }
+  
+  button{ padding:12px 16px; border:0; border-radius:10px; background:var(--em); color:#fff; font-weight:700; cursor:pointer }
+  button:disabled{ opacity:.5; cursor:not-allowed }
+  .btn-ghost{ background:#f1f5f9; color:#0f172a }
+  
+  .card{ border:1px solid var(--bd); border-radius:12px; padding:16px; margin:16px 0; background:var(--card); box-shadow:0 2px 8px rgba(0,0,0,.05); max-width:960px }
+  .card h3{ margin:0 0 12px; font-size:18px }
+  .row2{ display:flex; justify-content:space-between; gap:12px; margin:6px 0 }
+  .hr{ height:1px; background:#e5e7eb; margin:10px 0 }
 
-  /* [PC용 테이블] */
-  .table{ width:100%; border-collapse:collapse; margin-top:8px }
-  .table th { padding:10px; border-bottom:2px solid #eee; text-align:center; background:#f8fafc; font-size:14px; white-space:nowrap; }
-  .table td { padding:10px; border-bottom:1px solid #eee; vertical-align:middle; text-align:center; font-size:14px; }
-  .table th:first-child, .table td:first-child { text-align:left; }
-  .table td:first-child { white-space: normal; word-break: keep-all; }
+  /* [PC용 테이블] */
+  .table{ width:100%; border-collapse:collapse; margin-top:8px }
+  .table th { padding:10px; border-bottom:2px solid #eee; text-align:center; background:#f8fafc; font-size:14px; white-space:nowrap; }
+  .table td { padding:10px; border-bottom:1px solid #eee; vertical-align:middle; text-align:center; font-size:14px; }
+  .table th:first-child, .table td:first-child { text-align:left; }
+  .table td:first-child { white-space: normal; word-break: keep-all; }
 
-  .url{ color:#0a7cff; text-decoration:none; word-break:break-all }
-  .subtle{ color:#64748b; font-size:12px }
-  .item-box{ border:1px dashed #d1d5db; border-radius:10px; padding:12px; background:#fff }
+  .url{ color:#0a7cff; text-decoration:none; word-break:break-all }
+  .subtle{ color:#64748b; font-size:12px }
+  .item-box{ border:1px dashed #d1d5db; border-radius:10px; padding:12px; background:#fff }
 
-  .addr-row{ display:flex; gap:8px; align-items:center; }
-  .addr-input{ flex:1; }
-  .addr-btn{ flex:0 0 auto; }
+  .addr-row{ display:flex; gap:8px; align-items:center; }
+  .addr-input{ flex:1; }
+  .addr-btn{ flex:0 0 auto; }
 
-  /* [수정] Grid에서 discount 영역 제거 (4컬럼) */
-  .item-grid{ display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:12px; grid-template-areas: "url qty size notes"; }
-  .col-url{ grid-area:url; } .col-qty{ grid-area:qty; } .col-size{ grid-area:size; } .col-notes{ grid-area:notes; }
-  /* 할인율 컬럼 숨김 처리 */
-  .col-discount{ display:none; }
+  /* [수정] Grid에서 discount 영역 제거 (4컬럼) */
+  .item-grid{ display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:12px; grid-template-areas: "url qty size notes"; }
+  .col-url{ grid-area:url; } .col-qty{ grid-area:qty; } .col-size{ grid-area:size; } .col-notes{ grid-area:notes; }
+  /* 할인율 컬럼 숨김 처리 */
+  .col-discount{ display:none; }
 
-  .debug{ display:none; }
-  .debug-on .debug{ display:block; }
-  .btn-wrap{ display:flex; justify-content:center; margin-top: 16px; }
-  
-  /* [수정] PC/태블릿에서 버튼 크기 33.333%로 정확히 고정 */
-  .btn-resp { 
-    width: 33.333%; 
-    min-width: 200px; /* 너무 작아지는 것 방지 */
-    flex-shrink: 0;   /* flex 컨테이너 안에서 줄어들지 않도록 고정 */
-  }
-  
-  .note-text{ text-align:center; margin-top:6px; }
+  .debug{ display:none; }
+  .debug-on .debug{ display:block; }
+  .btn-wrap{ display:flex; justify-content:center; margin-top: 16px; }
+  
+  /* [수정] PC/태블릿에서 버튼 크기 33.333%로 정확히 고정 */
+  .btn-resp { 
+    width: 33.333%; 
+    min-width: 200px; /* 너무 작아지는 것 방지 */
+    flex-shrink: 0;   /* flex 컨테이너 안에서 줄어들지 않도록 고정 */
+  }
+  
+  .note-text{ text-align:center; margin-top:6px; }
 
-  /* [추가] 상품 확인 섹션 스타일 */
-  .rec-list { margin-top: 10px; max-height: 250px; overflow-y: auto; display: none; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0 10px; background: #fff; }
-  .rec-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
-  .rec-item:last-child { border-bottom: none; }
-  .rec-name { flex: 1; font-weight: 600; margin-right: 12px; }
-  .btn-mini { padding: 6px 12px; font-size: 13px; border-radius: 6px; cursor: pointer; border: 1px solid #cbd5e1; background: #f8fafc; color: #0a7cff; white-space: nowrap; font-weight: 500; }
-  .btn-mini:hover { background: #eff6ff; border-color: #bfdbfe; }
+  /* [추가] 상품 확인 섹션 스타일 */
+  .rec-list { margin-top: 10px; max-height: 250px; overflow-y: auto; display: none; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0 10px; background: #fff; }
+  .rec-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+  .rec-item:last-child { border-bottom: none; }
+  .rec-name { flex: 1; font-weight: 600; margin-right: 12px; }
+  .btn-mini { padding: 6px 12px; font-size: 13px; border-radius: 6px; cursor: pointer; border: 1px solid #cbd5e1; background: #f8fafc; color: #0a7cff; white-space: nowrap; font-weight: 500; }
+  .btn-mini:hover { background: #eff6ff; border-color: #bfdbfe; }
 
-  /* 모달 */
-  .modal{ position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; padding:16px; z-index:9990; }
-  .modal.open{ display:flex; }
-  .modal-card{ width:min(520px, 96vw); background:#fff; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.2); overflow:hidden; }
-  .modal-head{ padding:14px 18px; border-bottom:1px solid #eee; font-weight:700; }
-  .modal-body{ padding:24px 18px; color:#0f172a; font-size:16px; line-height:1.5; text-align:center; }
-  .modal-actions{ display:flex; gap:10px; padding:0 18px 18px 18px; justify-content:center; }
-  
-  .btn-confirm { width: 50%; background-color: #2563eb; color: white; padding: 12px 0; border-radius: 8px; font-weight: 700; font-size: 16px; transition: background-color 0.2s; }
-  .btn-confirm:hover { background-color: #1d4ed8; }
-  .btn-submit-order { width: 50%; background-color: #2563eb; color: white; padding: 12px 0; border-radius: 10px; font-weight: 700; font-size: 16px; margin: 8px auto; display: block; cursor: pointer; }
-  .btn-submit-order:hover { background-color: #1d4ed8; }
+  /* 모달 */
+  .modal{ position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; padding:16px; z-index:9990; }
+  .modal.open{ display:flex; }
+  .modal-card{ width:min(520px, 96vw); background:#fff; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.2); overflow:hidden; }
+  .modal-head{ padding:14px 18px; border-bottom:1px solid #eee; font-weight:700; }
+  .modal-body{ padding:24px 18px; color:#0f172a; font-size:16px; line-height:1.5; text-align:center; }
+  .modal-actions{ display:flex; gap:10px; padding:0 18px 18px 18px; justify-content:center; }
+  
+  .btn-confirm { width: 50%; background-color: #2563eb; color: white; padding: 12px 0; border-radius: 8px; font-weight: 700; font-size: 16px; transition: background-color 0.2s; }
+  .btn-confirm:hover { background-color: #1d4ed8; }
+  .btn-submit-order { width: 50%; background-color: #2563eb; color: white; padding: 12px 0; border-radius: 10px; font-weight: 700; font-size: 16px; margin: 8px auto; display: block; cursor: pointer; }
+  .btn-submit-order:hover { background-color: #1d4ed8; }
 
-  .info-modal { z-index: 9999; } 
-  .info-modal-content { position: relative; max-width: 95vw; max-height: 90vh; overflow: auto; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); background: transparent; }
-  .info-img { display: block; width: 100%; height: auto; max-width: 800px; margin: 0 auto; }
-  .info-close-btn { position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; border: none; font-size: 24px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
-  .info-close-btn:hover { background: rgba(0,0,0,0.8); }
+  .info-modal { z-index: 9999; } 
+  .info-modal-content { position: relative; max-width: 95vw; max-height: 90vh; overflow: auto; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); background: transparent; }
+  .info-img { display: block; width: 100%; height: auto; max-width: 800px; margin: 0 auto; }
+  .info-close-btn { position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; border: none; font-size: 24px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+  .info-close-btn:hover { background: rgba(0,0,0,0.8); }
 
-  @media (max-width: 768px){
-    body{ padding:16px; max-width:100%; }
-    .card{ max-width:100%; }
-    .row-3{ grid-template-columns:1fr; }
-    
-    .item-grid {
-      grid-template-columns: 1fr 1fr 1fr;
-      grid-template-areas:
-        "url url url"
-        "qty size notes"; /* 모바일에서도 discount 제거 */
-    }
+  @media (max-width: 768px){
+    body{ padding:16px; max-width:100%; }
+    .card{ max-width:100%; }
+    .row-3{ grid-template-columns:1fr; }
+    
+    .item-grid {
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-areas:
+        "url url url"
+        "qty size notes"; /* 모바일에서도 discount 제거 */
+    }
 
-    /* 모바일에서는 버튼 100% 꽉 차게 */
-    .btn-resp{ width:100%; }
-    
-    .note-text{ text-align:right; }
-    .btn-confirm, .btn-submit-order { width: 80%; }
+    /* 모바일에서는 버튼 100% 꽉 차게 */
+    .btn-resp{ width:100%; }
+    
+    .note-text{ text-align:right; }
+    .btn-confirm, .btn-submit-order { width: 80%; }
 
-    #items_fieldset .flex { flex-wrap: wrap; }
-    #addItem { white-space: nowrap; flex: 0 0 auto; }
-    .right.hint { margin-left: 0; margin-top: 8px; width: 100%; text-align: right; }
+    #items_fieldset .flex { flex-wrap: wrap; }
+    #addItem { white-space: nowrap; flex: 0 0 auto; }
+    .right.hint { margin-left: 0; margin-top: 8px; width: 100%; text-align: right; }
 
-    /* 모바일 카드 뷰 */
-    .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
-    .table thead { display: none; }
-    
-    .table tr {
-      margin-bottom: 15px;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 12px;
-      background: #fff;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    
-    .table td {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      text-align: right;
-      padding: 8px 0;
-      border-bottom: 1px dashed #f1f5f9;
-      font-size: 14px;
-    }
-    .table td:last-child { border-bottom: none; }
+    /* 모바일 카드 뷰 */
+    .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+    .table thead { display: none; }
+    
+    .table tr {
+      margin-bottom: 15px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    
+    .table td {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      text-align: right;
+      padding: 8px 0;
+      border-bottom: 1px dashed #f1f5f9;
+      font-size: 14px;
+    }
+    .table td:last-child { border-bottom: none; }
 
-    .table td:first-child {
-      display: block;
-      text-align: left;
-      font-weight: 700;
-      font-size: 16px;
-      color: #1e293b;
-      border-bottom: 2px solid #e2e8f0;
-      padding-bottom: 10px;
-      margin-bottom: 6px;
-    }
+    .table td:first-child {
+      display: block;
+      text-align: left;
+      font-weight: 700;
+      font-size: 16px;
+      color: #1e293b;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 10px;
+      margin-bottom: 6px;
+    }
 
-    .table td::before {
-      content: attr(data-label);
-      font-weight: 600;
-      color: #64748b;
-      margin-right: auto;
-    }
-    .table td:first-child::before { display: none; }
-  }
+    .table td::before {
+      content: attr(data-label);
+      font-weight: 600;
+      color: #64748b;
+      margin-right: auto;
+    }
+    .table td:first-child::before { display: none; }
+  }
 </style>
 </head>
 <body>
-<div id="auth_gate" style="position: fixed; inset: 0; background: rgba(250,250,250,0.98); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(5px);">
+<div id="auth_gate" style="position: fixed; inset: 0; background: rgba(250,250,250,1); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(5px);">
   <div class="card" style="width: 100%; max-width: 420px; text-align: center; border: 1px solid #e5e7eb; border-radius: 20px; padding: 32px 24px; background: #fff; box-shadow: 0 15px 35px rgba(0,0,0,0.08);">
     <h3 style="margin-bottom: 12px; font-size: 22px;">🔒 회원 인증</h3>
     <p style="color: #64748b; font-size: 15px; line-height: 1.6; margin-bottom: 24px;">목마교 회원 전용 폐쇄몰입니다.<br>등록된 이름과 인증번호를 입력해 주세요.</p>
@@ -194,66 +194,68 @@
   </div>
 </div>
 
+<div id="main_app" style="display: none;">
+
 <h1>공동구매 주문</h1>
 
 <div style="display: flex; justify-content: flex-end; margin-bottom: 4px; gap: 15px;">
-  <button type="button" id="btnNotice" class="btn-link">필독.공지사항</button>
-  <button type="button" id="btnHowTo" class="btn-link">주문방법</button>
+  <button type="button" id="btnNotice" class="btn-link">필독.공지사항</button>
+  <button type="button" id="btnHowTo" class="btn-link">주문방법</button>
 </div>
 
 <fieldset id="buyer_fieldset">
-  <legend>주문자 정보</legend>
-  <div class="row-3">
-    <div>
-      <label for="buyer_name">이름 *</label>
-      <input id="buyer_name" class="control" type="text" placeholder="킵초게" />
-    </div>
-    <div>
-      <label for="buyer_phone">연락처 *</label>
-      <input id="buyer_phone" class="control" type="tel" inputmode="numeric" pattern="[0-9\-]*" maxlength="13" placeholder="010-0000-0000" />
-    </div>
-    <div>
-      <label for="buyer_email">이메일 *</label>
-      <input id="buyer_email" class="control" type="email" placeholder="test@example.com" />
-    </div>
-  </div>
-  <div style="margin-top:12px">
-    <label for="buyer_addr">주소 *</label>
-    <div class="addr-row">
-      <input id="buyer_addr" class="control addr-input" type="text" placeholder="도로명 주소" />
-      <button id="addr_search" class="btn-ghost addr-btn" type="button">주소 검색</button>
-    </div>
-    <div class="hint">검색으로 기본 주소를 채운 후 상세주소는 이어서 입력합니다.</div>
-  </div>
+  <legend>주문자 정보</legend>
+  <div class="row-3">
+    <div>
+      <label for="buyer_name">이름 *</label>
+      <input id="buyer_name" class="control" type="text" placeholder="킵초게" />
+    </div>
+    <div>
+      <label for="buyer_phone">연락처 *</label>
+      <input id="buyer_phone" class="control" type="tel" inputmode="numeric" pattern="[0-9\-]*" maxlength="13" placeholder="010-0000-0000" />
+    </div>
+    <div>
+      <label for="buyer_email">이메일 *</label>
+      <input id="buyer_email" class="control" type="email" placeholder="test@example.com" />
+    </div>
+  </div>
+  <div style="margin-top:12px">
+    <label for="buyer_addr">주소 *</label>
+    <div class="addr-row">
+      <input id="buyer_addr" class="control addr-input" type="text" placeholder="도로명 주소" />
+      <button id="addr_search" class="btn-ghost addr-btn" type="button">주소 검색</button>
+    </div>
+    <div class="hint">검색으로 기본 주소를 채운 후 상세주소는 이어서 입력합니다.</div>
+  </div>
 </fieldset>
 
 <fieldset id="check_fieldset" style="background:#f0f9ff; border-color:#bae6fd;">
-  <legend style="color:#0284c7">상품 확인</legend>
-  <div style="margin-bottom:8px; color:#475569; font-size:14px;">
-    아래 카테고리에서 상품을 선택하여 <b>재고를 먼저 확인</b>해 주세요.<br>
-    원하는 상품 페이지에서 <b>주소(URL)를 복사</b>하여 아래 '상품 정보' 란에 붙여넣어 주세요.
-  </div>
-  
-  <label for="recCategory">카테고리 선택</label>
-  <select id="recCategory" class="control">
-    <option value="">📂 카테고리를 선택하세요</option>
-  </select>
-  
-  <div id="recList" class="rec-list">
-    </div>
+  <legend style="color:#0284c7">상품 확인</legend>
+  <div style="margin-bottom:8px; color:#475569; font-size:14px;">
+    아래 카테고리에서 상품을 선택하여 <b>재고를 먼저 확인</b>해 주세요.<br>
+    원하는 상품 페이지에서 <b>주소(URL)를 복사</b>하여 아래 '상품 정보' 란에 붙여넣어 주세요.
+  </div>
+  
+  <label for="recCategory">카테고리 선택</label>
+  <select id="recCategory" class="control">
+    <option value="">📂 카테고리를 선택하세요</option>
+  </select>
+  
+  <div id="recList" class="rec-list">
+    </div>
 </fieldset>
 
 <fieldset id="items_fieldset">
-  <legend>상품 정보</legend>
-  <div id="items"></div>
-  <div class="flex" style="margin-top:10px">
-    <button id="addItem" class="btn-ghost" type="button">+ 상품 추가</button>
-    <span class="right hint">배송 규칙: 전체 수량 기준 <b>3개마다 3,500원</b> 부과</span>
-  </div>
+  <legend>상품 정보</legend>
+  <div id="items"></div>
+  <div class="flex" style="margin-top:10px">
+    <button id="addItem" class="btn-ghost" type="button">+ 상품 추가</button>
+    <span class="right hint">배송 규칙: 전체 수량 기준 <b>3개마다 3,500원</b> 부과</span>
+  </div>
 </fieldset>
 
 <div class="btn-wrap" style="margin-bottom:4px">
-  <button id="btn" type="button" class="btn-resp">주문 검토하기</button>
+  <button id="btn" type="button" class="btn-resp">주문 검토하기</button>
 </div>
 <div class="muted note-text">검토 후 주문 정보가 표시됩니다.</div>
 
@@ -261,29 +263,29 @@
 <div id="result" class="result"></div>
 <pre id="out" class="muted debug">아직 요청 전입니다.</pre>
 
-<div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-  <div class="modal-card">
-    <div class="modal-head" id="modalTitle">알림</div>
-    <div class="modal-body" id="modalMsg">메시지</div>
-    <div class="modal-actions">
-      <button id="modalBtn" type="button" class="btn-confirm">확인</button>
-    </div>
-  </div>
+</div> <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal-card">
+    <div class="modal-head" id="modalTitle">알림</div>
+    <div class="modal-body" id="modalMsg">메시지</div>
+    <div class="modal-actions">
+      <button id="modalBtn" type="button" class="btn-confirm">확인</button>
+    </div>
+  </div>
 </div>
 
 <div id="infoModal" class="modal info-modal" role="dialog" aria-modal="true">
-  <div class="info-modal-content">
-    <button type="button" id="infoCloseBtn" class="info-close-btn" aria-label="닫기">&times;</button>
-    <img src="https://raw.githubusercontent.com/fitmora/groupbuy-form/90aae86d5e581e2013054c54435a4df8780d430b/howto.jpg" alt="주문방법 안내" class="info-img">
-  </div>
-</div> 
+  <div class="info-modal-content">
+    <button type="button" id="infoCloseBtn" class="info-close-btn" aria-label="닫기">&times;</button>
+    <img src="https://raw.githubusercontent.com/fitmora/groupbuy-form/90aae86d5e581e2013054c54435a4df8780d430b/howto.jpg" alt="주문방법 안내" class="info-img">
+  </div>
+</div> 
 
 <div id="noticeModal" class="modal info-modal" role="dialog" aria-modal="true">
-  <div class="modal-card" style="max-width: 800px;"> <div class="modal-head">📢 공동구매 필독 공지사항</div>
-    <button type="button" id="noticeCloseBtn" class="info-close-btn" style="top: 8px; right: 12px;">&times;</button>
-    <div class="modal-body" style="text-align: left; font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #111; max-height: 70vh; overflow-y: auto; padding: 20px;">
+  <div class="modal-card" style="max-width: 800px;"> <div class="modal-head">📢 공동구매 필독 공지사항</div>
+    <button type="button" id="noticeCloseBtn" class="info-close-btn" style="top: 8px; right: 12px;">&times;</button>
+    <div class="modal-body" style="text-align: left; font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #111; max-height: 70vh; overflow-y: auto; padding: 20px;">
 안녕하세요.
-다음 내용을 정확히 숙지하시고 진행해주세요. 
+다음 내용을 정확히 숙지하시고 진행해주세요. 
 
 <b>1. 구매 가능 브랜드</b>
 : <strong>아디다스, 푸마, 뉴발란스, 살로몬, 미즈노, 서코니, 호카, 온러닝, 미즈노, 브룩스, cep, ciele, 아식스(슈즈 제외)
@@ -291,8 +293,8 @@
 - cep, ciele 추가되었습니다.</strong>
 
 * <b>디나엘 4 사전판매</b> (민트 색상으로 링크 제품과 색상이 다르니 주의하세요)
-<img src="https://images.puma.com/image/upload/f_auto,q_auto,b_rgb:fafafa,w_1200,h_1200/global/312127/03/sv02/fnd/PNA/fmt/png/Deviate-NITRO%E2%84%A2-Elite-4-Men's-Road-Running-Shoes" 
-     style="width: 100%; max-width: 400px; display: block; margin: 10px 0; border-radius: 8px; border: 1px solid #eee;">
+<img src="https://images.puma.com/image/upload/f_auto,q_auto,b_rgb:fafafa,w_1200,h_1200/global/312127/03/sv02/fnd/PNA/fmt/png/Deviate-NITRO%E2%84%A2-Elite-4-Men's-Road-Running-Shoes" 
+     style="width: 100%; max-width: 400px; display: block; margin: 10px 0; border-radius: 8px; border: 1px solid #eee;">
 - 주문 가능 사이즈 : 235~290
 - 주문 가능 사이즈 : 235~290
 - 상품확인의 카테고리에서 ‘사전구매’ 선택 후 연결되는 링크를 복사하여 주문합니다. '요청/참고사항'란에 ‘사전구매 확인’을 적어주세요.
@@ -301,20 +303,20 @@
 
 * 배송비는 동일주소 시 3품목당 1회 부과하며, 제주 및 도서 3,000원 추가입니다. 주문 완료 및 입금 완료 후 기존 주문에 합배송 요청은 자제 부탁드립니다.
 
-      
+      
 <b>2. 진행 기간 : 2월 14일 ~ 2월 18일 오후 6시</b>
 - 마감 후 주문은 불가합니다.
 - 주문은 목마교 회원만 가능합니다.(지인 주문 진행 시 '요청/참고사항’란에 목마교 회원명을 기입해주세요)
-- 주문 순서대로 사이즈 할당되며, 재고 조기 소진 시 주문 취소 될 수 있습니다. 
+- 주문 순서대로 사이즈 할당되며, 재고 조기 소진 시 주문 취소 될 수 있습니다. 
 
-      
+      
 <b>3. 제품은 2월 20일 (금요일) 일괄 발송합니다.</b>
 
-      
+      
 <b>4. 제품 및 일반 문의</b>
 : 우측 하단의 버튼을 클릭하여 채팅방을 이용해주시고, 부득이한 상황을 제외하고 개인 카톡은 자제 부탁드립니다.
 
-      
+      
 <b>5. 교환 및 환불</b>
 - 하단의 '교환 및 반품 요청 양식'을 작성, 문자를 통해 담당자에게 직접 접수를 하셔야 합니다.
 - 문자접수 연락처 : 010-5042-7811
@@ -324,39 +326,39 @@
 - 제품에 이상 있을 시 교환 불가할 수 있습니다. (상자 훼손, 택 없음, 제품 오염 등)
 - A/S는 접수된 순서대로 순차적으로 진행되며, 영업일 기준 1주~2주 소요됩니다.(접수 많을 시 지연될 수 있습니다.)
 
-<strong>(교환 및 반품 요청 양식)</strong> 
+<strong>(교환 및 반품 요청 양식)</strong> 
 ——————————————————————————
 -교환 및 반품-
 분류 : 사이즈교환 or 제품교환 / 반품
-성함 : 
-전화번호 : 
-주소 : 
+성함 : 
+전화번호 : 
+주소 : 
 구매 제품 : 제품명+품번+사이즈 (아디제로 아디오스 프로 4 W(JR6355)-235)
-구매일 : 
+구매일 : 
 교환 제품 : 제품명+품번+사이즈 (교환시에만 작성)
 
 환불 문의는 담당자 통해서 문의 부탁드립니다.
 
 -수선&심의접수-
 분류 : 수선 or 심의접수(제품 불량 등)
-성함 : 
-전화번호 : 
-주소 : 
+성함 : 
+전화번호 : 
+주소 : 
 접수 제품 : 제품명+품번+사이즈
-구매일 : 
+구매일 : 
 내용 : 어느쪽 발인지 표기, 내용 상세하게 작성
 사진 첨부 : 선택 사항이며, 필요시 요청드릴 수 있습니다.
 ——————————————————————————
 
-      
+      
 <b>6. 기타 안내</b>
-: 공구는 목마교 회원분들과 혜택을 공유하는 차원에서 진행하고 있습니다. 브랜드 본사와 할인 판매에 대한 문제가 발생할 수 있으니, 보안을 당부를 드리며, 개별 현금영수증 발행은 어려운 점 양해 부탁드립니다. 
+: 공구는 목마교 회원분들과 혜택을 공유하는 차원에서 진행하고 있습니다. 브랜드 본사와 할인 판매에 대한 문제가 발생할 수 있으니, 보안을 당부를 드리며, 개별 현금영수증 발행은 어려운 점 양해 부탁드립니다. 
 
 감사합니다.
-    </div>
-  </div>
+    </div>
+  </div>
 </div>
-  
+  
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 
 <script>
@@ -394,8 +396,9 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
     const result = await response.json();
 
     if (result.allowed) {
-      // ✅ 성공: 게이트 닫기 및 이름 자동 세팅
+      // ✅ 성공: 게이트 닫기 및 메인 앱 보이기
       document.getElementById('auth_gate').style.display = 'none';
+      document.getElementById('main_app').style.display = 'block'; // (추가됨)
       document.getElementById('buyer_name').value = name;
     } else {
       // ❌ 실패: n8n에서 보내준 실패 메시지 표시
@@ -409,39 +412,39 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
     btnEl.textContent = "인증 및 입장하기";
   }
 });
-  
+  
 /* ===== 🛒 추천 상품 데이터 (여기만 수정하면 메뉴가 바뀝니다) ===== */
 const RECOMMENDED_ITEMS = {
-  "사전구매": [
-    { 
-      name: "디비에이트 나이트로 엘리트 4", 
-      url: "https://onyourmark-running.com/product/디비에이트-나이트로-엘리트-431212706/4516/category/24/display/1/" ,
-      type: "order" // 주문하기 버튼으로 동작하도록 마킹
-    },
- ],
-  "브랜드": [
-    { name: "아디다스", url: "https://onyourmark-running.com/category/adidas/258/" },
-    { name: "푸마", url: "https://onyourmark-running.com/category/Puma/261/" },
-    { name: "브룩스", url: "https://onyourmark-running.com/category/Brooks/587/" },
-    { name: "CEP", url: "https://onyourmark-running.com/category/Cep/388/" },
-    { name: "씨엘르", url: "https://onyourmark-running.com/category/Ciele/427/" },
-    { name: "호카", url: "https://onyourmark-running.com/category/Hoka/262/" },
-    { name: "미즈노", url: "https://onyourmark-running.com/category/Mizuno/263/" },
-    { name: "ON", url: "https://onyourmark-running.com/category/On/800/" },
-    { name: "살로몬", url: "https://onyourmark-running.com/category/Salomon/472/" },
-    { name: "서코니", url: "https://onyourmark-running.com/category/Saucony/674/" }, 
-  ],
-  "남성": [
-    { name: "러닝화", url: "https://onyourmark-running.com/category/Footwear/29/" },
-    { name: "의류", url: "https://onyourmark-running.com/category/Apparel/30/" },
-  ],
-  "여성": [
-    { name: "러닝화", url: "https://onyourmark-running.com/category/Footwear/32/" },
-    { name: "의류", url: "https://onyourmark-running.com/category/Apparel/33/" },
-  ],
-  "기타 액세서리": [
-    { name: "모자/양말 외", url: "https://onyourmark-running.com/category/Gear/26/" },
-  ]
+  "사전구매": [
+    { 
+      name: "디비에이트 나이트로 엘리트 4", 
+      url: "https://onyourmark-running.com/product/디비에이트-나이트로-엘리트-431212706/4516/category/24/display/1/" ,
+      type: "order" // 주문하기 버튼으로 동작하도록 마킹
+    },
+ ],
+  "브랜드": [
+    { name: "아디다스", url: "https://onyourmark-running.com/category/adidas/258/" },
+    { name: "푸마", url: "https://onyourmark-running.com/category/Puma/261/" },
+    { name: "브룩스", url: "https://onyourmark-running.com/category/Brooks/587/" },
+    { name: "CEP", url: "https://onyourmark-running.com/category/Cep/388/" },
+    { name: "씨엘르", url: "https://onyourmark-running.com/category/Ciele/427/" },
+    { name: "호카", url: "https://onyourmark-running.com/category/Hoka/262/" },
+    { name: "미즈노", url: "https://onyourmark-running.com/category/Mizuno/263/" },
+    { name: "ON", url: "https://onyourmark-running.com/category/On/800/" },
+    { name: "살로몬", url: "https://onyourmark-running.com/category/Salomon/472/" },
+    { name: "서코니", url: "https://onyourmark-running.com/category/Saucony/674/" }, 
+  ],
+  "남성": [
+    { name: "러닝화", url: "https://onyourmark-running.com/category/Footwear/29/" },
+    { name: "의류", url: "https://onyourmark-running.com/category/Apparel/30/" },
+  ],
+  "여성": [
+    { name: "러닝화", url: "https://onyourmark-running.com/category/Footwear/32/" },
+    { name: "의류", url: "https://onyourmark-running.com/category/Apparel/33/" },
+  ],
+  "기타 액세서리": [
+    { name: "모자/양말 외", url: "https://onyourmark-running.com/category/Gear/26/" },
+  ]
 };
 
 /* ===== DEBUG & UTIL ===== */
@@ -457,16 +460,16 @@ document.addEventListener('keydown', (e)=>{ if(!e.altKey)return; if(e.code==='Ke
 
 /* ===== 설정 ===== */
 const VALIDATE_URL = "https://primary-production-97a64.up.railway.app/webhook/groupbuy/validate";
-const SUBMIT_URL   = "https://primary-production-97a64.up.railway.app/webhook/internal-order-feed";
-const ADMIN_EMAIL  = "elvina79@gmail.com";
+const SUBMIT_URL   = "https://primary-production-97a64.up.railway.app/webhook/internal-order-feed";
+const ADMIN_EMAIL  = "elvina79@gmail.com";
 
 /* [수정] 할인 옵션: '자동 적용' 하나만 남김 */
 const DISCOUNT_OPTIONS = [
-  { key:'auto', label:'자동 적용', mode:'auto', value:0 }
+  { key:'auto', label:'자동 적용', mode:'auto', value:0 }
 ];
 
 /* ===== Dom & Utils ===== */
-const $  = s => document.querySelector(s);
+const $  = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const out = $('#out');
 const result = $('#result');
@@ -480,20 +483,20 @@ const krw = n => (Number(n||0)).toLocaleString('ko-KR') + '원';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 function digitsOnly(s){ return String(s||'').replace(/\D+/g,''); }
 function formatPhoneKR(d){
-  d = digitsOnly(d);
-  if (!d) return '';
-  if (d.length <= 3) return d;
-  if (d.length <= 7) return d.replace(/(\d{3})(\d+)/, '$1-$2');
-  if (d.length === 10) return d.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
-  return d.slice(0,11).replace(/(\d{3})(\d{4})(\d{4}).*/, '$1-$2-$3');
+  d = digitsOnly(d);
+  if (!d) return '';
+  if (d.length <= 3) return d;
+  if (d.length <= 7) return d.replace(/(\d{3})(\d+)/, '$1-$2');
+  if (d.length === 10) return d.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  return d.slice(0,11).replace(/(\d{3})(\d{4})(\d{4}).*/, '$1-$2-$3');
 }
 
 /* ===== 모달 로직 ===== */
 const modal = $('#modal'), modalMsg = $('#modalMsg'), modalBtn = $('#modalBtn');
-let isSuccessAction = false; 
+let isSuccessAction = false; 
 function handleModalClick() {
-  modal.classList.remove('open');
-  if (isSuccessAction) window.location.reload();
+  modal.classList.remove('open');
+  if (isSuccessAction) window.location.reload();
 }
 modalBtn.addEventListener('click', handleModalClick);
 
@@ -504,396 +507,396 @@ const noticeCloseBtn = $('#noticeCloseBtn');
 btnNotice.addEventListener('click', () => { noticeModal.classList.add('open'); });
 noticeCloseBtn.addEventListener('click', () => { noticeModal.classList.remove('open'); });
 noticeModal.addEventListener('click', (e) => { if (e.target === noticeModal) noticeModal.classList.remove('open'); });
-  
+  
 const infoModal = $('#infoModal');
 const btnHowTo = $('#btnHowTo');
 const infoCloseBtn = $('#infoCloseBtn');
 btnHowTo.addEventListener('click', () => { infoModal.classList.add('open'); });
 infoCloseBtn.addEventListener('click', () => { infoModal.classList.remove('open'); });
 infoModal.addEventListener('click', (e) => { if (e.target === infoModal) infoModal.classList.remove('open'); });
-document.addEventListener('keydown', (e)=>{ 
-  if(e.key==='Escape') {
-    if (infoModal.classList.contains('open')) infoModal.classList.remove('open');
-    else if (modal.classList.contains('open')) handleModalClick();
-  }
+document.addEventListener('keydown', (e)=>{ 
+  if(e.key==='Escape') {
+    if (infoModal.classList.contains('open')) infoModal.classList.remove('open');
+    else if (modal.classList.contains('open')) handleModalClick();
+  }
 });
-function openModalHTML(html, success = false){ 
-  modalMsg.innerHTML = html; 
-  modal.classList.add('open'); 
-  isSuccessAction = success; 
+function openModalHTML(html, success = false){ 
+  modalMsg.innerHTML = html; 
+  modal.classList.add('open'); 
+  isSuccessAction = success; 
 }
 
 /* ===== 상태 & 리스너 ===== */
 let mode = 'edit';
-let lastValidated = null; 
+let lastValidated = null; 
 let submitting = false;
 const MAX_ITEMS = Infinity;
 
 $('#addr_search').addEventListener('click', () => {
-  if ($('#addr_search').disabled) return;
-  new daum.Postcode({
-    oncomplete: function(data) {
-      const addr = data.roadAddress || data.address;
-      const zone = data.zonecode ? `(${data.zonecode}) ` : '';
-      const current = $('#buyer_addr').value.trim();
-      $('#buyer_addr').value = zone + addr + (current ? ' ' + current : '');
-      $('#buyer_addr').focus();
-    }
-  }).open();
+  if ($('#addr_search').disabled) return;
+  new daum.Postcode({
+    oncomplete: function(data) {
+      const addr = data.roadAddress || data.address;
+      const zone = data.zonecode ? `(${data.zonecode}) ` : '';
+      const current = $('#buyer_addr').value.trim();
+      $('#buyer_addr').value = zone + addr + (current ? ' ' + current : '');
+      $('#buyer_addr').focus();
+    }
+  }).open();
 });
 $('#buyer_phone').addEventListener('input', function() {
-  const raw = this.value;
-  const selStart = this.selectionStart || 0;
-  const digitsBefore = (raw.slice(0, selStart).match(/\d/g) || []).length;
-  this.value = formatPhoneKR(raw);
+  const raw = this.value;
+  const selStart = this.selectionStart || 0;
+  const digitsBefore = (raw.slice(0, selStart).match(/\d/g) || []).length;
+  this.value = formatPhoneKR(raw);
 });
 
 /* ===== 추천상품 초기화 로직 (독립 실행) ===== */
 function initRecommendation() {
-  const catSel = document.getElementById('recCategory');
-  const listDiv = document.getElementById('recList');
+  const catSel = document.getElementById('recCategory');
+  const listDiv = document.getElementById('recList');
 
-  // 카테고리 옵션 채우기
-  Object.keys(RECOMMENDED_ITEMS).forEach(cat => {
-    catSel.innerHTML += `<option value="${cat}">${cat}</option>`;
-  });
+  // 카테고리 옵션 채우기
+  Object.keys(RECOMMENDED_ITEMS).forEach(cat => {
+    catSel.innerHTML += `<option value="${cat}">${cat}</option>`;
+  });
 
-  catSel.addEventListener('change', () => {
-    const cat = catSel.value;
-    listDiv.innerHTML = '';
-    
-    if (cat && RECOMMENDED_ITEMS[cat]) {
-      listDiv.style.display = 'block';
-      RECOMMENDED_ITEMS[cat].forEach(item => {
-        const itemEl = document.createElement('div');
-        itemEl.className = 'rec-item';
-        itemEl.innerHTML = `
-          <span class="rec-name">${item.name}</span>
-          <button type="button" class="btn-mini link-btn">🔗 사이트 이동</button>
-        `;
-        
-        // 이동 버튼 클릭
-        itemEl.querySelector('.link-btn').addEventListener('click', () => {
-          window.open(item.url, '_blank');
-        });
-        
-        listDiv.appendChild(itemEl);
-      });
-    } else {
-      listDiv.style.display = 'none';
-    }
-  });
+  catSel.addEventListener('change', () => {
+    const cat = catSel.value;
+    listDiv.innerHTML = '';
+    
+    if (cat && RECOMMENDED_ITEMS[cat]) {
+      listDiv.style.display = 'block';
+      RECOMMENDED_ITEMS[cat].forEach(item => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'rec-item';
+        itemEl.innerHTML = `
+          <span class="rec-name">${item.name}</span>
+          <button type="button" class="btn-mini link-btn">🔗 사이트 이동</button>
+        `;
+        
+        // 이동 버튼 클릭
+        itemEl.querySelector('.link-btn').addEventListener('click', () => {
+          window.open(item.url, '_blank');
+        });
+        
+        listDiv.appendChild(itemEl);
+      });
+    } else {
+      listDiv.style.display = 'none';
+    }
+  });
 }
 
 /* ===== 아이템 행 생성 ===== */
 function discountSelectHTML(){
-  const opts = DISCOUNT_OPTIONS.map(o => `<option value="${o.key}">${o.label}</option>`).join('');
-  return `<select name="discount_choice" class="control">${opts}</select>`;
+  const opts = DISCOUNT_OPTIONS.map(o => `<option value="${o.key}">${o.label}</option>`).join('');
+  return `<select name="discount_choice" class="control">${opts}</select>`;
 }
 
 function createItemRow(idx){
-  const el = document.createElement('div');
-  el.className = 'item-box';
-  el.dataset.idx = idx;
-  el.innerHTML = `
-    <div class="item-grid">
-      <div class="col-url">
-        <label>상품 URL *</label>
-        <input name="product_url" class="control" type="url" placeholder="https://··· 실제 상품 URL" required />
-      </div>
-      <div class="col-qty">
-        <label>수량 *</label>
-        <input name="qty" class="control" type="number" min="1" step="1" value="1" />
-      </div>
-      <div class="col-size">
-        <label>사이즈 *</label>
-        <input name="size" class="control" type="text" placeholder="예: 285 / 100" />
-      </div>
-      <div class="col-discount">
-        <label>할인율 *</label>
-        ${discountSelectHTML()}
-      </div>
-      <div class="col-notes">
-        <label>요청/참고사항</label>
-        <input name="notes" class="control" type="text" placeholder="예: 합배송" />
-      </div>
-    </div>
-    <div class="flex" style="margin-top:8px">
-      <button type="button" class="btn-ghost remove">– 제거</button>
-      <span class="muted">필수: URL / 수량 / 사이즈</span>
-    </div>
-  `;
-  el.querySelector('.remove').addEventListener('click', () => {
-    if ($$('#items .item-box').length <= 1) return;
-    el.remove(); refreshControls();
-  });
-  return el;
+  const el = document.createElement('div');
+  el.className = 'item-box';
+  el.dataset.idx = idx;
+  el.innerHTML = `
+    <div class="item-grid">
+      <div class="col-url">
+        <label>상품 URL *</label>
+        <input name="product_url" class="control" type="url" placeholder="https://··· 실제 상품 URL" required />
+      </div>
+      <div class="col-qty">
+        <label>수량 *</label>
+        <input name="qty" class="control" type="number" min="1" step="1" value="1" />
+      </div>
+      <div class="col-size">
+        <label>사이즈 *</label>
+        <input name="size" class="control" type="text" placeholder="예: 285 / 100" />
+      </div>
+      <div class="col-discount">
+        <label>할인율 *</label>
+        ${discountSelectHTML()}
+      </div>
+      <div class="col-notes">
+        <label>요청/참고사항</label>
+        <input name="notes" class="control" type="text" placeholder="예: 합배송" />
+      </div>
+    </div>
+    <div class="flex" style="margin-top:8px">
+      <button type="button" class="btn-ghost remove">– 제거</button>
+      <span class="muted">필수: URL / 수량 / 사이즈</span>
+    </div>
+  `;
+  el.querySelector('.remove').addEventListener('click', () => {
+    if ($$('#items .item-box').length <= 1) return;
+    el.remove(); refreshControls();
+  });
+  return el;
 }
 function refreshControls(){
-  const count = $$('#items .item-box').length;
-  addItemBtn.disabled = count >= MAX_ITEMS || addItemBtn.dataset.locked === '1';
-  $$('#items .item-box .remove').forEach(b => b.disabled = (count <= 1) || (addItemBtn.dataset.locked === '1'));
+  const count = $$('#items .item-box').length;
+  addItemBtn.disabled = count >= MAX_ITEMS || addItemBtn.dataset.locked === '1';
+  $$('#items .item-box .remove').forEach(b => b.disabled = (count <= 1) || (addItemBtn.dataset.locked === '1'));
 }
 function initItems(){
-  itemsWrap.innerHTML = '';
-  itemsWrap.appendChild(createItemRow(0));
-  refreshControls();
+  itemsWrap.innerHTML = '';
+  itemsWrap.appendChild(createItemRow(0));
+  refreshControls();
 }
 addItemBtn.addEventListener('click', () => {
-  if (addItemBtn.dataset.locked === '1') return;
-  itemsWrap.appendChild(createItemRow($$('#items .item-box').length));
-  refreshControls();
+  if (addItemBtn.dataset.locked === '1') return;
+  itemsWrap.appendChild(createItemRow($$('#items .item-box').length));
+  refreshControls();
 });
 
 /* ===== 페이로드 생성/검증 ===== */
 function buildPayload(){
-  const buyer = {
-    name:   $('#buyer_name').value.trim(),
-    phone:  formatPhoneKR($('#buyer_phone').value),
-    email:  $('#buyer_email').value.trim(),
-    address:$('#buyer_addr').value.trim(),
-  };
-  const items = $$('#items .item-box').map(box => {
-    const $q = s => box.querySelector(s);
-    const choiceKey = ($q('select[name="discount_choice"]').value || '').trim();
-    const choice = DISCOUNT_OPTIONS.find(o => o.key === choiceKey) || {mode:null, value:null};
-    return {
-      product_url: ($q('input[name="product_url"]').value || '').trim(),
-      qty: Number($q('input[name="qty"]').value || 1),
-      size: ($q('input[name="size"]').value || '').trim(),
-      notes: ($q('input[name="notes"]').value || '').trim(),
-      discount_mode: choice.mode,
-      discount_value: choice.value == null ? null : Number(choice.value),
-      discount_rate: choice.mode === 'percent' ? Number(choice.value) : null,
-      fixed_price:   choice.mode === 'fixed'   ? Number(choice.value) : null,
-    };
-  });
-  return { groups: [{ ...buyer, items }] };
+  const buyer = {
+    name:    $('#buyer_name').value.trim(),
+    phone:   formatPhoneKR($('#buyer_phone').value),
+    email:   $('#buyer_email').value.trim(),
+    address: $('#buyer_addr').value.trim(),
+  };
+  const items = $$('#items .item-box').map(box => {
+    const $q = s => box.querySelector(s);
+    const choiceKey = ($q('select[name="discount_choice"]').value || '').trim();
+    const choice = DISCOUNT_OPTIONS.find(o => o.key === choiceKey) || {mode:null, value:null};
+    return {
+      product_url: ($q('input[name="product_url"]').value || '').trim(),
+      qty: Number($q('input[name="qty"]').value || 1),
+      size: ($q('input[name="size"]').value || '').trim(),
+      notes: ($q('input[name="notes"]').value || '').trim(),
+      discount_mode: choice.mode,
+      discount_value: choice.value == null ? null : Number(choice.value),
+      discount_rate: choice.mode === 'percent' ? Number(choice.value) : null,
+      fixed_price:   choice.mode === 'fixed'   ? Number(choice.value) : null,
+    };
+  });
+  return { groups: [{ ...buyer, items }] };
 }
 function validateRequired(payload){
-  const g = payload?.groups?.[0];
-  if (!g || !g.name || !g.email || !g.address) return { ok:false, msg:'주문자 정보를 모두 입력해 주세요.' };
-  if (!g.phone || g.phone.length < 10) return { ok:false, msg:'연락처를 올바르게 입력해 주세요.' };
-  if (!g.items.length) return { ok:false, msg:'상품을 추가해 주세요.' };
-  for(let i=0; i<g.items.length; i++){
-    const it = g.items[i];
-    if(!/^https?:\/\//i.test(it.product_url)) return { ok:false, msg:`#${i+1} 상품 URL을 확인해 주세요.` };
-    if(!it.discount_mode) return { ok:false, msg:`#${i+1} 할인 항목을 선택해 주세요.` };
-  }
-  return { ok:true };
+  const g = payload?.groups?.[0];
+  if (!g || !g.name || !g.email || !g.address) return { ok:false, msg:'주문자 정보를 모두 입력해 주세요.' };
+  if (!g.phone || g.phone.length < 10) return { ok:false, msg:'연락처를 올바르게 입력해 주세요.' };
+  if (!g.items.length) return { ok:false, msg:'상품을 추가해 주세요.' };
+  for(let i=0; i<g.items.length; i++){
+    const it = g.items[i];
+    if(!/^https?:\/\//i.test(it.product_url)) return { ok:false, msg:`#${i+1} 상품 URL을 확인해 주세요.` };
+    if(!it.discount_mode) return { ok:false, msg:`#${i+1} 할인 항목을 선택해 주세요.` };
+  }
+  return { ok:true };
 }
 
 /* ===== 검토/전송 ===== */
 async function doValidate(){
-  const payload = buildPayload();
-  const vReq = validateRequired(payload);
-  if (!vReq.ok) { alert(vReq.msg); return; }
+  const payload = buildPayload();
+  const vReq = validateRequired(payload);
+  if (!vReq.ok) { alert(vReq.msg); return; }
 
-  out.textContent = '검토 요청 중…';
-  btn.disabled = true;
-  try{
-    const res = await fetch(VALIDATE_URL, {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json().catch(()=>null);
-    if(!data){ throw new Error('No JSON response'); }
-    
-    lastValidated = data;
-    renderOrderCard(data);
-    enterReview();
-  }catch(e){
-    out.textContent = '검토 요청 실패: ' + e;
-    alert('정보를 불러오지 못했습니다. URL을 확인해 주세요.');
-  }finally{
-    btn.disabled = false;
-  }
+  out.textContent = '검토 요청 중…';
+  btn.disabled = true;
+  try{
+    const res = await fetch(VALIDATE_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(()=>null);
+    if(!data){ throw new Error('No JSON response'); }
+    
+    lastValidated = data;
+    renderOrderCard(data);
+    enterReview();
+  }catch(e){
+    out.textContent = '검토 요청 실패: ' + e;
+    alert('정보를 불러오지 못했습니다. URL을 확인해 주세요.');
+  }finally{
+    btn.disabled = false;
+  }
 }
 
 function enterReview(){
-  mode = 'review';
-  btn.textContent = '주문 수정하기';
-  $('#buyer_fieldset').style.opacity = .6;
-  $('#items_fieldset').style.opacity = .6;
-  $('#check_fieldset').style.opacity = .6; /* [추가] 상품확인 섹션도 흐리게 */
-  $$('input, select, button:not(#btn):not(#modalBtn):not(#confirmBtn):not(#btnHowTo):not(#infoCloseBtn)').forEach(el => el.disabled = true);
-  showReviewHeader('주문 검토');
+  mode = 'review';
+  btn.textContent = '주문 수정하기';
+  $('#buyer_fieldset').style.opacity = .6;
+  $('#items_fieldset').style.opacity = .6;
+  $('#check_fieldset').style.opacity = .6; /* [추가] 상품확인 섹션도 흐리게 */
+  $$('input, select, button:not(#btn):not(#modalBtn):not(#confirmBtn):not(#btnHowTo):not(#infoCloseBtn)').forEach(el => el.disabled = true);
+  showReviewHeader('주문 검토');
 }
 function enterEdit(){
-  mode = 'edit';
-  btn.textContent = '주문 검토하기';
-  $('#buyer_fieldset').style.opacity = 1;
-  $('#items_fieldset').style.opacity = 1;
-  $('#check_fieldset').style.opacity = 1;
-  $$('input, select, button').forEach(el => el.disabled = false);
-  refreshControls();
-  reviewHeader.style.display = 'none';
-  result.innerHTML = '';
-  window.scrollTo({ top:0, behavior:'smooth' });
+  mode = 'edit';
+  btn.textContent = '주문 검토하기';
+  $('#buyer_fieldset').style.opacity = 1;
+  $('#items_fieldset').style.opacity = 1;
+  $('#check_fieldset').style.opacity = 1;
+  $$('input, select, button').forEach(el => el.disabled = false);
+  refreshControls();
+  reviewHeader.style.display = 'none';
+  result.innerHTML = '';
+  window.scrollTo({ top:0, behavior:'smooth' });
 }
 function showReviewHeader(title){
-  reviewHeader.textContent = title;
-  reviewHeader.style.display = 'block';
+  reviewHeader.textContent = title;
+  reviewHeader.style.display = 'block';
 }
 
 /* 렌더링 */
 function renderOrderCard(resp){
-  result.innerHTML = '';
-  if (!resp?.ok){
-    const errs = (resp?.errors || []).map(e => esc(e.message)).join('<br>');
-    result.innerHTML = `<div class="card"><div class="muted">${errs || '오류 발생'}</div></div>`;
-    return;
-  }
-  
-  const sum = resp.summary || {};
-  const items = resp.groups?.[0]?.items || [];
+  result.innerHTML = '';
+  if (!resp?.ok){
+    const errs = (resp?.errors || []).map(e => esc(e.message)).join('<br>');
+    result.innerHTML = `<div class="card"><div class="muted">${errs || '오류 발생'}</div></div>`;
+    return;
+  }
+  
+  const sum = resp.summary || {};
+  const items = resp.groups?.[0]?.items || [];
 
-  const rows = items.map(it => {
-    const name = esc(it.name || '(상품명 없음)');
-    /* [수정] 할인율 표시 로직: 자동모드일 때 n8n이 계산해준 값 우선 */
-    let disc = '';
-    if (it.discount_mode === 'fixed') disc = '고정가';
-    else if (it.discount_rate) disc = `${it.discount_rate}%`;
-    else disc = '자동 적용';
+  const rows = items.map(it => {
+    const name = esc(it.name || '(상품명 없음)');
+    /* [수정] 할인율 표시 로직: 자동모드일 때 n8n이 계산해준 값 우선 */
+    let disc = '';
+    if (it.discount_mode === 'fixed') disc = '고정가';
+    else if (it.discount_rate) disc = `${it.discount_rate}%`;
+    else disc = '자동 적용';
 
-    const price = Number(it.display_price ?? it.original_price ?? it.listed_price ?? 0);
-    return `
-      <tr>
-        <td>
-          <div style="font-weight:700">${name}</div>
-          <div class="subtle"><a href="${esc(it.product_url)}" target="_blank" class="url">상품 페이지 열기</a> · 사이즈: ${esc(it.size)}${it.notes?` · 메모: ${esc(it.notes)}`:''}</div>
-        </td>
-        <td data-label="가격">${krw(price)}</td>
-        <td data-label="할인율">${disc}</td>
-        <td data-label="수량">${it.qty}</td>
-        <td data-label="소계" style="text-align:right; font-weight:bold">${krw(it.total)}</td>
-      </tr>`;
-  }).join('');
+    const price = Number(it.display_price ?? it.original_price ?? it.listed_price ?? 0);
+    return `
+      <tr>
+        <td>
+          <div style="font-weight:700">${name}</div>
+          <div class="subtle"><a href="${esc(it.product_url)}" target="_blank" class="url">상품 페이지 열기</a> · 사이즈: ${esc(it.size)}${it.notes?` · 메모: ${esc(it.notes)}`:''}</div>
+        </td>
+        <td data-label="가격">${krw(price)}</td>
+        <td data-label="할인율">${disc}</td>
+        <td data-label="수량">${it.qty}</td>
+        <td data-label="소계" style="text-align:right; font-weight:bold">${krw(it.total)}</td>
+      </tr>`;
+  }).join('');
 
-  result.innerHTML = `
-    <div class="card">
-      <h3>주문 정보</h3>
-      <table class="table">
-        <thead>
-          <tr><th>상품명</th><th>가격</th><th>할인율</th><th>수량</th><th style="text-align:right">소계</th></tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <div class="hr"></div>
-      <div class="row2"><div>상품 합계</div><div>${krw(sum.items_total)}</div></div>
-      <div class="row2"><div>배송비</div><div>${krw(sum.shipping_total)}</div></div>
-      <div class="hr"></div>
-      <div class="row2"><div><strong>총 결제금액</strong></div><div><strong>${krw(sum.grand_total)}</strong></div></div>
-      <div class="hr"></div>
-       <div class="row2" style="align-items:flex-start">
-        <div><strong>입금계좌 정보</strong></div>
-        <div style="text-align:right">
-          국민은행 / 819210349569 (예금주: 이민웅)
-        </div>
-      </div>
-    </div>
-    <div class="btn-wrap" style="margin-top:16px">
-      <button id="confirmBtn" type="button" class="btn-submit-order">확인 및 주문하기</button>
-    </div>
-  `;
-  
-  $('#confirmBtn').addEventListener('click', submitFinal);
+  result.innerHTML = `
+    <div class="card">
+      <h3>주문 정보</h3>
+      <table class="table">
+        <thead>
+          <tr><th>상품명</th><th>가격</th><th>할인율</th><th>수량</th><th style="text-align:right">소계</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="hr"></div>
+      <div class="row2"><div>상품 합계</div><div>${krw(sum.items_total)}</div></div>
+      <div class="row2"><div>배송비</div><div>${krw(sum.shipping_total)}</div></div>
+      <div class="hr"></div>
+      <div class="row2"><div><strong>총 결제금액</strong></div><div><strong>${krw(sum.grand_total)}</strong></div></div>
+      <div class="hr"></div>
+       <div class="row2" style="align-items:flex-start">
+        <div><strong>입금계좌 정보</strong></div>
+        <div style="text-align:right">
+          국민은행 / 819210349569 (예금주: 이민웅)
+        </div>
+      </div>
+    </div>
+    <div class="btn-wrap" style="margin-top:16px">
+      <button id="confirmBtn" type="button" class="btn-submit-order">확인 및 주문하기</button>
+    </div>
+  `;
+  
+  $('#confirmBtn').addEventListener('click', submitFinal);
 }
 
 async function submitFinal(){
-  if (submitting) return;
+  if (submitting) return;
 
-  const payload = buildPayload();
-  
-  if (lastValidated && lastValidated.groups && lastValidated.groups[0]) {
-    const validItems = lastValidated.groups[0].items || [];
-    
-    if (payload.groups[0].items.length === validItems.length) {
-       payload.groups[0].items = payload.groups[0].items.map((it, i) => {
-         const v = validItems[i];
-         
-         let rawName = v.name || '';
-         let cleanName = rawName.replace(/^.*온유어마크[^|]*\|\s*/i, '').trim();
-         if (!cleanName) cleanName = rawName;
+  const payload = buildPayload();
+  
+  if (lastValidated && lastValidated.groups && lastValidated.groups[0]) {
+    const validItems = lastValidated.groups[0].items || [];
+    
+    if (payload.groups[0].items.length === validItems.length) {
+       payload.groups[0].items = payload.groups[0].items.map((it, i) => {
+         const v = validItems[i];
+         
+         let rawName = v.name || '';
+         let cleanName = rawName.replace(/^.*온유어마크[^|]*\|\s*/i, '').trim();
+         if (!cleanName) cleanName = rawName;
 
-         return {
-           ...it, 
-           name: cleanName,
-           price: v.price,
-           original_price: v.original_price,
-           listed_price: v.listed_price,
-           display_price: v.display_price,
-           total: v.total
-         };
-       });
-       payload.summary = lastValidated.summary;
-    }
-  }
+         return {
+           ...it, 
+           name: cleanName,
+           price: v.price,
+           original_price: v.original_price,
+           listed_price: v.listed_price,
+           display_price: v.display_price,
+           total: v.total
+         };
+       });
+       payload.summary = lastValidated.summary;
+    }
+  }
 
-  openModalHTML('주문 접수 중입니다… 잠시만 기다려 주세요.', false);
-  submitting = true;
-  $('#confirmBtn').disabled = true;
-  btn.disabled = true;
+  openModalHTML('주문 접수 중입니다… 잠시만 기다려 주세요.', false);
+  submitting = true;
+  $('#confirmBtn').disabled = true;
+  btn.disabled = true;
 
-  try{
-    const body = {
-      ...payload,
-      _validated: lastValidated || null, 
-      _client: { ts: Date.now() },
-      _notify: {
-        customer: { send: true },
-        admin:    { send: true, email: ADMIN_EMAIL, mode: 'summary' }
-      }
-    };
+  try{
+    const body = {
+      ...payload,
+      _validated: lastValidated || null, 
+      _client: { ts: Date.now() },
+      _notify: {
+        customer: { send: true },
+        admin:     { send: true, email: ADMIN_EMAIL, mode: 'summary' }
+      }
+    };
 
-    const res = await fetch(SUBMIT_URL, {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify(body),
-    });
+    const res = await fetch(SUBMIT_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify(body),
+    });
 
-    const data = await res.json().catch(()=>null);
-    const ok = (data && (data.ok === true || data.status === 'ok')) || res.ok;
+    const data = await res.json().catch(()=>null);
+    const ok = (data && (data.ok === true || data.status === 'ok')) || res.ok;
 
-    if (ok){
-      showReviewHeader('주문 완료');
-      const totalTxt = data?.summary?.grand_total ? `총 결제금액: ${krw(data.summary.grand_total)}` : '';
-      const sheetUrl = data?.sheet?.url;
-      
-      let html = '주문이 접수되었습니다. 확인 이메일이 곧 발송됩니다.';
-      if (totalTxt) html += `<br><small>${totalTxt}</small>`;
-      if (sheetUrl) html += `<br><br><a href="${sheetUrl}" target="_blank">구글 시트 확인</a>`;
+    if (ok){
+      showReviewHeader('주문 완료');
+      const totalTxt = data?.summary?.grand_total ? `총 결제금액: ${krw(data.summary.grand_total)}` : '';
+      const sheetUrl = data?.sheet?.url;
+      
+      let html = '주문이 접수되었습니다. 확인 이메일이 곧 발송됩니다.';
+      if (totalTxt) html += `<br><small>${totalTxt}</small>`;
+      if (sheetUrl) html += `<br><br><a href="${sheetUrl}" target="_blank">구글 시트 확인</a>`;
 
-      openModalHTML(html, true); 
-    }else{
-      openModalHTML('주문 접수 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.', false);
-      $('#confirmBtn').disabled = false;
-      btn.disabled = false;
-    }
-  }catch(e){
-    openModalHTML('네트워크 오류가 발생했습니다. 다시 시도해 주세요.', false);
-    $('#confirmBtn').disabled = false;
-    btn.disabled = false;
-  }finally{
-    submitting = false;
-  }
+      openModalHTML(html, true); 
+    }else{
+      openModalHTML('주문 접수 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.', false);
+      $('#confirmBtn').disabled = false;
+      btn.disabled = false;
+    }
+  }catch(e){
+    openModalHTML('네트워크 오류가 발생했습니다. 다시 시도해 주세요.', false);
+    $('#confirmBtn').disabled = false;
+    btn.disabled = false;
+  }finally{
+    submitting = false;
+  }
 }
 
 btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else doValidate(); });
-(function init(){ 
-  initItems();
-  initRecommendation(); // 추천상품 로직 초기화
+(function init(){ 
+  initItems();
+  initRecommendation(); // 추천상품 로직 초기화
 })();
 </script>
 
 <div style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
-    <a href="https://open.kakao.com/o/gpQL7W6h" target="_blank">
-        <img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_medium.png" 
-             style="width: 60px; height: 60px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); border-radius: 50%;"
-             alt="카카오톡 상담">
-    </a>
+    <a href="https://open.kakao.com/o/gpQL7W6h" target="_blank">
+        <img src="https://developers.kakao.com/assets/img/about/logos/kakaotalksharing/kakaotalk_sharing_btn_medium.png" 
+             style="width: 60px; height: 60px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); border-radius: 50%;"
+             alt="카카오톡 상담">
+    </a>
 </div>
-  
+  
 </body>
 </html>

@@ -356,7 +356,7 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
   const name = nameInput.value.trim();
   const phone = phoneInput.value.replace(/[^0-9]/g, ''); // 숫자만 추출
 
-  if(!name || !phone) { alert("회원명과 연락처를 입력해 주세요."); return; }
+  if(!name || !phone) { alert("회원명과 인증번호를 입력해 주세요."); return; }
 
   btnEl.disabled = true;
   btnEl.textContent = "인증 중...";

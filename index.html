@@ -601,7 +601,7 @@ function createItemRow(idx){
       </div>
       <div class="col-size">
         <label>사이즈 *</label>
-        <input name="size" class="control" type="text" placeholder="예: 285 / 100" />
+        <input name="size" class="control" type="text" placeholder="예: 285 / 100" oninput="this.value = this.value.toUpperCase();" />
       </div>
       <div class="col-discount">
         <label>할인율 *</label>

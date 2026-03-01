@@ -643,6 +643,7 @@ addItemBtn.addEventListener('click', () => {
 function buildPayload(){
   const buyer = {
     name:    $('#buyer_name').value.trim(),
+    crew_name: "목마교",
     phone:   formatPhoneKR($('#buyer_phone').value),
     email:   $('#buyer_email').value.trim(),
     address: $('#buyer_addr').value.trim(),

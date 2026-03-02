@@ -814,7 +814,9 @@ async function submitFinal(){
            display_price: v.display_price,
            discount_label: v.discount_label, 
            discount_rate: v.discount_rate,
-           total: v.total
+           total: v.total,
+           supply_rate: v.supply_rate,
+           supply_price: v.supply_price
          };
        });
        payload.summary = lastValidated.summary;

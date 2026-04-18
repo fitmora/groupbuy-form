@@ -367,10 +367,6 @@
 /* ===== 🔒 n8n 실시간 인증번호 연동 (세션 유지 추가) ===== */
 const AUTH_URL = "https://primary-production-97a64.up.railway.app/webhook/member-auth"; 
 
-// ✅ 현재 접속한 URL에서 크루 정보를 추출 (교차 검증용)
-const currentUrlParams = new URLSearchParams(location.search);
-const currentCrew = currentUrlParams.get('crew') || '일반';
-
 // ✅ localStorage 대신 sessionStorage 사용 (창 닫으면 리셋)
 function handleAuthSuccess(name, crew) {
   document.getElementById('auth_gate').style.display = 'none';
@@ -403,7 +399,7 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       // ✅ n8n으로 검증을 위해 접속한 크루 정보도 함께 전송!
-      body: JSON.stringify({ name: name, code: code, crew: currentCrew }) 
+      body: JSON.stringify({ name: name, code: code }) 
     });
     
     const result = await response.json();

@@ -370,14 +370,14 @@ const AUTH_URL = "https://primary-production-97a64.up.railway.app/webhook/member
 // ✅ 1. 이 프론트엔드는 무조건 '썬데이서울' 구역임을 명확히 선언합니다! (가장 중요)
 const currentCrew = '썬데이서울';
   
-// ✅ localStorage 대신 sessionStorage 사용 (창 닫으면 리셋)
-function handleAuthSuccess(name, crew) {
+// ✅ 매개변수 자리에 time을 정확히 넣어줍니다.
+function handleAuthSuccess(name, crew, time) {
   document.getElementById('auth_gate').style.display = 'none';
   document.getElementById('main_app').style.display = 'block';
   document.getElementById('buyer_name').value = name;
 
-  // ✅ 새로고침 시에는 기존 시간을 유지하고, 최초 로그인 시에만 현재 시간을 저장합니다.
-  const sessionTime = existingTime || Date.now();
+  // ✅ 전달받은 time이 있으면 그걸 쓰고, 없으면 지금 시간을 새로 만듭니다.
+  const sessionTime = time || Date.now();
   sessionStorage.setItem('weecl_session', JSON.stringify({ name: name, crew: crew, time: sessionTime }));
 }
 
@@ -411,8 +411,8 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
     const result = await response.json();
 
     if (result.allowed || result.ok) {
-      // ✅ 세 번째 인자를 비워서 보내면 handleAuthSuccess 내부에서 현재 시간으로 세팅합니다.
-      handleAuthSuccess(name, result.crew);
+      // ✅ 세 번째 인자로 null을 보내서 '최초 로그인 시각'을 생성하게 합니다.
+      handleAuthSuccess(name, result.crew, null);
     } else {
       msgArea.textContent = result.msg || "등록된 정보가 일치하지 않습니다.";
       msgArea.style.display = 'block';

@@ -227,6 +227,24 @@
     </div>
     <div class="hint">검색으로 기본 주소를 채운 후 상세주소는 이어서 입력합니다.</div>
   </div>
+
+  <div style="margin-top: 24px; padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+    <div style="display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px;">
+      <input type="checkbox" id="essential_consent" style="margin-top: 3px; transform: scale(1.2);">
+      <label for="essential_consent" style="margin: 0; font-weight: 500; font-size: 14px; color: #334155; line-height: 1.4;">
+        [필수] 개인정보 수집 및 이용 동의 <br>
+        <span style="font-weight: 400; font-size: 12px; color: #64748b;">주문 확인 및 배송 처리를 위해 필요한 최소한의 정보입니다.</span>
+      </label>
+    </div>
+    <hr style="border: 0; border-top: 1px solid #cbd5e1; margin: 12px 0;">
+    <div style="display: flex; gap: 10px; align-items: flex-start;">
+      <input type="checkbox" id="marketing_consent" checked style="margin-top: 3px; transform: scale(1.2);">
+      <label for="marketing_consent" style="margin: 0; font-weight: 500; font-size: 14px; color: #1d4ed8; line-height: 1.4;">
+        [선택] WEECL 특가 및 공구 오픈 알림 수신 동의 <br>
+        <span style="font-weight: 400; font-size: 12px; color: #64748b;">동의 시 가장 먼저 특가 오픈 알림톡을 보내드립니다.</span>
+      </label>
+    </div>
+  </div>
 </fieldset>
 
 <fieldset id="check_fieldset" style="background:#f0f9ff; border-color:#bae6fd;">
@@ -350,13 +368,16 @@
 /* ===== 🔒 n8n 실시간 인증번호 연동 (세션 유지 추가) ===== */
 const AUTH_URL = "https://primary-production-97a64.up.railway.app/webhook/member-auth"; 
 
-// 인증 성공 시 공통 처리 함수 (추가됨)
-function handleAuthSuccess(name) {
+// ✅ 현재 접속한 URL에서 크루 정보를 추출 (교차 검증용)
+const currentUrlParams = new URLSearchParams(location.search);
+const currentCrew = currentUrlParams.get('crew') || '일반';
+
+// ✅ localStorage 대신 sessionStorage 사용 (창 닫으면 리셋)
+function handleAuthSuccess(name, crew) {
   document.getElementById('auth_gate').style.display = 'none';
   document.getElementById('main_app').style.display = 'block';
   document.getElementById('buyer_name').value = name;
-  // 세션 저장을 위해 localStorage에 기록 (추가됨)
-  localStorage.setItem('mokmagyo_session', JSON.stringify({ name: name, time: Date.now() }));
+  sessionStorage.setItem('weecl_session', JSON.stringify({ name: name, crew: crew, time: Date.now() }));
 }
 
 document.getElementById('auth_btn').addEventListener('click', async () => {
@@ -368,7 +389,6 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
   const name = nameInput.value.trim();
   const code = codeInput.value.trim();
 
-  // 1. 프론트엔드 유효성 검사 (4~8자리 숫자)
   if(!name || code.length < 4 || code.length > 8 || isNaN(code)) { 
     msgArea.textContent = "성함과 인증번호(4~8자리 숫자)를 확인해 주세요.";
     msgArea.style.display = 'block';
@@ -383,21 +403,20 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
     const response = await fetch(AUTH_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, code }) // n8n으로 code 필드명으로 전송
+      // ✅ n8n으로 검증을 위해 접속한 크루 정보도 함께 전송!
+      body: JSON.stringify({ name: name, code: code, crew: currentCrew }) 
     });
     
     const result = await response.json();
 
-    if (result.allowed) {
-      // ✅ 성공 호출
-      handleAuthSuccess(name);
+    if (result.allowed || result.ok) { // n8n 응답 방식에 따라 안전하게 처리
+      handleAuthSuccess(name, currentCrew);
     } else {
-      // ❌ 실패: n8n에서 보내준 실패 메시지 표시
       msgArea.textContent = result.msg || "등록된 정보가 일치하지 않습니다.";
       msgArea.style.display = 'block';
     }
   } catch (err) {
-    alert("서버 연결 실패. n8n의 CORS 헤더(Access-Control-Allow-Origin: *) 설정을 확인해 주세요.");
+    alert("서버 연결 실패. n8n 설정을 확인해 주세요.");
   } finally {
     btnEl.disabled = false;
     btnEl.textContent = "인증 및 입장하기";
@@ -636,10 +655,11 @@ addItemBtn.addEventListener('click', () => {
 function buildPayload(){
   const buyer = {
     name:    $('#buyer_name').value.trim(),
-    crew_name: "썬데이서울",
+    crew_name: currentCrew, // ✅ 하드코딩 제거: 현재 접속 크루로 자동 세팅
     phone:   formatPhoneKR($('#buyer_phone').value),
     email:   $('#buyer_email').value.trim(),
     address: $('#buyer_addr').value.trim(),
+    marketing_consent: $('#marketing_consent') ? $('#marketing_consent').checked : false // ✅ 마케팅 동의 여부 전송
   };
   const items = $$('#items .item-box').map(box => {
     const $q = s => box.querySelector(s);
@@ -673,6 +693,14 @@ function validateRequired(payload){
 
 /* ===== 검토/전송 ===== */
 async function doValidate(){
+  // ✅ 필수 개인정보 수집 동의 체크 검사
+  const essConsent = $('#essential_consent');
+  if (essConsent && !essConsent.checked) {
+    alert('주문 처리를 위해 [필수] 개인정보 수집에 동의해 주세요.');
+    essConsent.focus();
+    return;
+  }
+
   const payload = buildPayload();
   const vReq = validateRequired(payload);
   if (!vReq.ok) { alert(vReq.msg); return; }
@@ -876,18 +904,21 @@ btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else d
 
 (function init(){ 
   initItems();
-  initRecommendation(); // 추천상품 로직 초기화
+  initRecommendation(); 
 
-  // [추가됨] 페이지 로드 시 기존 인증 정보 확인 (localStorage 체크)
-  const saved = localStorage.getItem('mokmagyo_session');
+  // ✅ sessionStorage 확인 (1시간 경과 또는 크루 다를 시 만료)
+  const saved = sessionStorage.getItem('weecl_session');
   if (saved) {
     try {
       const data = JSON.parse(saved);
-      // 24시간 이내 인증만 유효하게 설정 (원치 않으시면 시간 체크 빼셔도 됩니다)
-      if (Date.now() - data.time < 24 * 60 * 60 * 1000) {
-        handleAuthSuccess(data.name);
+      const now = Date.now();
+      // 1시간(3600000ms) 이내이고, 접속한 크루 링크가 일치할 때만 유지
+      if (now - data.time < 3600000 && data.crew === currentCrew) {
+        handleAuthSuccess(data.name, data.crew);
+      } else {
+        sessionStorage.removeItem('weecl_session');
       }
-    } catch(e) { localStorage.removeItem('mokmagyo_session'); }
+    } catch(e) { sessionStorage.removeItem('weecl_session'); }
   }
 })();
 </script>

@@ -911,14 +911,14 @@ btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else d
   initItems();
   initRecommendation(); 
 
-  // ✅ sessionStorage 확인 (1시간 경과 또는 크루 다를 시 만료)
+  // ✅ sessionStorage 확인 (1시간 경과 시 만료)
   const saved = sessionStorage.getItem('weecl_session');
   if (saved) {
     try {
       const data = JSON.parse(saved);
       const now = Date.now();
-      // 1시간(3600000ms) 이내이고, 접속한 크루 링크가 일치할 때만 유지
-      if (now - data.time < 3600000 && data.crew === currentCrew) {
+      // 💡 에러 나던 currentCrew 비교 완전 삭제! 1시간 이내면 무조건 유지!
+      if (now - data.time < 3600000) {
         handleAuthSuccess(data.name, data.crew);
       } else {
         sessionStorage.removeItem('weecl_session');

@@ -648,13 +648,23 @@ addItemBtn.addEventListener('click', () => {
 
 /* ===== 페이로드 생성/검증 ===== */
 function buildPayload(){
+  // ✅ 세션에서 로그인 시 n8n이 알려준 '진짜 소속' 꺼내오기
+  let realCrew = '일반';
+  try {
+    const sessionStr = sessionStorage.getItem('weecl_session');
+    if (sessionStr) {
+      const sessionData = JSON.parse(sessionStr);
+      if (sessionData.crew) realCrew = sessionData.crew;
+    }
+  } catch(e) {}
+
   const buyer = {
     name:    $('#buyer_name').value.trim(),
-    crew_name: currentCrew, // ✅ 하드코딩 제거: 현재 접속 크루로 자동 세팅
+    crew_name: realCrew, // 💡 에러 나던 currentCrew 대신 세션에서 꺼낸 realCrew 사용!
     phone:   formatPhoneKR($('#buyer_phone').value),
     email:   $('#buyer_email').value.trim(),
     address: $('#buyer_addr').value.trim(),
-    marketing_consent: $('#marketing_consent') ? $('#marketing_consent').checked : false // ✅ 마케팅 동의 여부 전송
+    marketing_consent: $('#marketing_consent') ? $('#marketing_consent').checked : false
   };
   const items = $$('#items .item-box').map(box => {
     const $q = s => box.querySelector(s);

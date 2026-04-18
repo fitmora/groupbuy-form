@@ -367,18 +367,37 @@
 /* ===== 🔒 n8n 실시간 인증번호 연동 (세션 유지 추가) ===== */
 const AUTH_URL = "https://primary-production-97a64.up.railway.app/webhook/member-auth"; 
 
-// ✅ 1. 이 프론트엔드는 무조건 '썬데이서울' 구역임을 명확히 선언합니다! (가장 중요)
+const SESSION_KEY = 'weecl_session';
+const SESSION_TTL = 3600000; // 1시간
 const currentCrew = '썬데이서울';
-  
-// ✅ 매개변수 자리에 time을 정확히 넣어줍니다.
+
+function normalizeCrew(value) {
+  return String(value ?? '').trim();
+}
+
 function handleAuthSuccess(name, crew, time) {
+  const normalizedCrew = normalizeCrew(crew);
+  const normalizedCurrentCrew = normalizeCrew(currentCrew);
+
+  if (normalizedCrew !== normalizedCurrentCrew) {
+    sessionStorage.removeItem(SESSION_KEY);
+    document.getElementById('auth_gate').style.display = 'flex';
+    document.getElementById('main_app').style.display = 'none';
+    return;
+  }
+
   document.getElementById('auth_gate').style.display = 'none';
   document.getElementById('main_app').style.display = 'block';
-  document.getElementById('buyer_name').value = name;
+  const buyerInput = document.getElementById('buyer_name');
+  if (buyerInput) buyerInput.value = name || '';
 
-  // ✅ 전달받은 time이 있으면 그걸 쓰고, 없으면 지금 시간을 새로 만듭니다.
-  const sessionTime = time || Date.now();
-  sessionStorage.setItem('weecl_session', JSON.stringify({ name: name, crew: crew, time: sessionTime }));
+  const sessionTime = Number.isFinite(Number(time)) && Number(time) > 0 ? Number(time) : Date.now();
+
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+    name: name || '',
+    crew: normalizedCrew,
+    time: sessionTime
+  }));
 }
 
 document.getElementById('auth_btn').addEventListener('click', async () => {
@@ -411,8 +430,13 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
     const result = await response.json();
 
     if (result.allowed || result.ok) {
-      // ✅ 세 번째 인자로 null을 보내서 '최초 로그인 시각'을 생성하게 합니다.
-      handleAuthSuccess(name, result.crew, null);
+      const resultCrew = normalizeCrew(result.crew);
+      if (resultCrew !== normalizeCrew(currentCrew)) {
+        msgArea.textContent = "이 페이지는 썬데이서울 전용입니다.";
+        msgArea.style.display = 'block';
+        return;
+      }
+      handleAuthSuccess(name, resultCrew, Date.now());
     } else {
       msgArea.textContent = result.msg || "등록된 정보가 일치하지 않습니다.";
       msgArea.style.display = 'block';
@@ -909,18 +933,22 @@ btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else d
   initItems();
   initRecommendation(); 
 
-  const saved = sessionStorage.getItem('weecl_session');
-  if (saved) {
-    try {
-      const data = JSON.parse(saved);
-      const now = Date.now();
-      // ✅ 1시간 이내이고 소속이 같으면, 기존 저장된 시간(data.time)을 함께 넘겨서 유지시킵니다.
-      if (now - data.time < 3600000 && data.crew === currentCrew) {
-        handleAuthSuccess(data.name, data.crew, data.time);
-      } else {
-        sessionStorage.removeItem('weecl_session');
-      }
-    } catch(e) { sessionStorage.removeItem('weecl_session'); }
+  const saved = sessionStorage.getItem(SESSION_KEY);
+  if (!saved) return;
+
+  try {
+    const data = JSON.parse(saved);
+    const now = Date.now();
+    const savedCrew = normalizeCrew(data.crew);
+    const savedTime = Number(data.time);
+
+    if (Number.isFinite(savedTime) && now - savedTime < SESSION_TTL && savedCrew === normalizeCrew(currentCrew)) {
+      handleAuthSuccess(data.name, savedCrew, savedTime);
+    } else {
+      sessionStorage.removeItem(SESSION_KEY);
+    }
+  } catch (e) {
+    sessionStorage.removeItem(SESSION_KEY);
   }
 })();
 </script>

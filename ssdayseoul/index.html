@@ -409,7 +409,7 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
     const result = await response.json();
 
     if (result.allowed || result.ok) { // n8n 응답 방식에 따라 안전하게 처리
-      handleAuthSuccess(name, currentCrew);
+      handleAuthSuccess(name, result.crew);
     } else {
       msgArea.textContent = result.msg || "등록된 정보가 일치하지 않습니다.";
       msgArea.style.display = 'block';

@@ -430,13 +430,12 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
     const result = await response.json();
 
     if (result.allowed || result.ok) {
-      const resultCrew = normalizeCrew(result.crew);
-      if (resultCrew !== normalizeCrew(currentCrew)) {
-        msgArea.textContent = "이 페이지는 썬데이서울 전용입니다.";
-        msgArea.style.display = 'block';
-        return;
-      }
-      handleAuthSuccess(name, resultCrew, Date.now());
+      // ✅ 서버가 주는 crew 값에 매몰되지 않습니다.
+      // 인증(ok)만 통과했다면, 이 프론트엔드의 주인인 currentCrew('썬데이서울')를 강제로 사용합니다.
+      const fixedCrew = normalizeCrew(currentCrew);
+      
+      // ✅ 세션 저장 시에도 확실한 값을 넘겨서 새로고침 시 튕기는 걸 방지합니다.
+      handleAuthSuccess(name, fixedCrew, Date.now());
     } else {
       msgArea.textContent = result.msg || "등록된 정보가 일치하지 않습니다.";
       msgArea.style.display = 'block';

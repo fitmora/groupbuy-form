@@ -375,7 +375,10 @@ function handleAuthSuccess(name, crew) {
   document.getElementById('auth_gate').style.display = 'none';
   document.getElementById('main_app').style.display = 'block';
   document.getElementById('buyer_name').value = name;
-  sessionStorage.setItem('weecl_session', JSON.stringify({ name: name, crew: crew, time: Date.now() }));
+
+  // ✅ 새로고침 시에는 기존 시간을 유지하고, 최초 로그인 시에만 현재 시간을 저장합니다.
+  const sessionTime = existingTime || Date.now();
+  sessionStorage.setItem('weecl_session', JSON.stringify({ name: name, crew: crew, time: sessionTime }));
 }
 
 document.getElementById('auth_btn').addEventListener('click', async () => {
@@ -407,7 +410,8 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
     
     const result = await response.json();
 
-    if (result.allowed || result.ok) { // n8n 응답 방식에 따라 안전하게 처리
+    if (result.allowed || result.ok) {
+      // ✅ 세 번째 인자를 비워서 보내면 handleAuthSuccess 내부에서 현재 시간으로 세팅합니다.
       handleAuthSuccess(name, result.crew);
     } else {
       msgArea.textContent = result.msg || "등록된 정보가 일치하지 않습니다.";
@@ -905,15 +909,14 @@ btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else d
   initItems();
   initRecommendation(); 
 
-  // ✅ sessionStorage 확인 (1시간 경과 시 만료)
   const saved = sessionStorage.getItem('weecl_session');
   if (saved) {
     try {
       const data = JSON.parse(saved);
       const now = Date.now();
-      // ✅ 4. 시간이 안 지났더라도, 세션의 소속과 현재 프론트(currentCrew)가 다르면 강제 로그아웃!
+      // ✅ 1시간 이내이고 소속이 같으면, 기존 저장된 시간(data.time)을 함께 넘겨서 유지시킵니다.
       if (now - data.time < 3600000 && data.crew === currentCrew) {
-        handleAuthSuccess(data.name, data.crew);
+        handleAuthSuccess(data.name, data.crew, data.time);
       } else {
         sessionStorage.removeItem('weecl_session');
       }

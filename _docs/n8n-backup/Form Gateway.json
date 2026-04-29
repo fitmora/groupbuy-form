@@ -1,0 +1,559 @@
+{
+  "name": "Form Gateway",
+  "nodes": [
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -160,
+        896
+      ],
+      "id": "67f823e3-d5fa-4858-b96f-c186e342ac8d",
+      "name": "Respond to Webhook1",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "={{ (String($json.__abort\n      ? 'https://httpbin.org/status/204'\n      : ($json.product_url?.startsWith('http')\n          ? $json.product_url\n          : 'https://httpbin.org/html')))\n    .replace(/^\\s*=+/, '') }}\n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {},
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text",
+              "outputPropertyName": "html"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -704,
+        896
+      ],
+      "id": "abf5cde7-db70-4f5a-b4f9-4e9eab090bc0",
+      "name": "HTTP Request",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "groupbuy/validate",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1248,
+        896
+      ],
+      "id": "b04420bb-1376-4e78-9a9e-716514adb1ed",
+      "name": "Webhook1",
+      "webhookId": "0a858205-2021-47c5-8160-0174e3ed1519"
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- Finalize Response ---\n// Mode: Run Once for All Items\n// 입력: 앞 노드(Price Parse & Merge)에서 아이템 스트림\n// 출력: ok/errors/summary/groups[0] (groups[0] 상단에 buyer 보존)\n\nfunction toNum(v, d = 0) {\n  const n = Number(String(v ?? '').replace(/[^\\d.-]/g, ''));\n  return Number.isFinite(n) ? n : d;\n}\nfunction toInt(v, d = 0) {\n  const n = parseInt(String(v ?? '').replace(/[^\\d-]/g, ''), 10);\n  return Number.isFinite(n) ? n : d;\n}\nfunction pick(obj, keys) {\n  for (const k of keys) {\n    const v = obj && obj[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);\n  }\n  return '';\n}\n\n// 0) 입력 아이템 수집\nconst arr = $items().map(i => i.json || {});\n\n// abort 패스스루\nconst abort = arr.find(x => x && x.__abort);\nif (abort) {\n  return [{ json: abort }];\n}\n\n// 1) buyer 추출 — 오직 item.buyer에서만!\n//    어떤 경우에도 아이템 루트의 name(상품명) 등을 구매자 이름으로 쓰지 않음.\nfunction extractBuyerFromItems(items) {\n  // buyer 정보가 가장 풍부한 첫 아이템의 buyer를 우선 사용\n  const withBuyer = items.find(x =>\n    x.buyer && (\n      x.buyer.name || x.buyer.phone || x.buyer.email || x.buyer.address ||\n      x.buyer.memo || x.buyer.note || x.buyer.notes\n    )\n  );\n  const b = (withBuyer && withBuyer.buyer) || {};\n\n  // 필요한 필드만 엄격 추출 (루트 필드로는 절대 보강하지 않음)\n  return {\n    name:    pick(b, ['name','buyer_name','customer_name','이름']) || '',\n    phone:   pick(b, ['phone','tel','mobile','전화','전화번호'])   || '',\n    email:   pick(b, ['email','mail','이메일'])                    || '',\n    address: pick(b, ['address','addr','주소'])                    || '',\n    memo:    pick(b, ['memo','note','notes'])                      || '',\n  };\n}\n\nconst buyer = extractBuyerFromItems(arr);\n\n// 2) 라인 계산(이중 할인 금지: total = price × qty)\nconst errors = [];\nconst lines = arr.map((x, idx) => {\n  const qty    = Math.max(1, toInt(x.qty, 1));\n  const unit   = toNum(x.price, 0);                 // 최종 단가(Price Parse & Merge에서 확정)\n  const oprice = toNum(x.original_price, 0) || null; // 소비자가(정가)\n  const lprice = toNum(x.listed_price, 0)   || null; // 페이지 표시가(참고)\n  const dprice = (x.display_price != null) ? toNum(x.display_price, null) : (oprice || lprice);\n\n  const total  = unit ? Math.round(unit * qty) : 0;  // ★ 절대 퍼센트 재적용 금지\n\n  if (!unit) errors.push({ message: `가격 추출 실패: #${(x.item_idx ?? idx) + 1}` });\n\n  // 표시용 할인 라벨\n  let discount_label = '0%';\n  const rateNum = toNum(x.discount_rate, 0);\n  if (x.discount_mode === 'fixed') discount_label = '고정';\n  else if (rateNum > 0) discount_label = `${rateNum}%`;\n\n  return {\n    product_url    : String(x.product_url || ''),\n    name           : String(x.name || ''),\n    qty            : qty,\n    price          : unit,                 // 최종 단가(실결제가)\n    original_price : oprice,               // 소비자가(정가)\n    listed_price   : lprice,               // 참고\n    display_price  : dprice,               // 프런트 \"가격\" 칼럼에 사용(= original || listed)\n    discount_mode  : x.discount_mode || null,\n    discount_rate  : rateNum,              // 숫자(퍼센트). 고정가면 0\n    discount_label : discount_label,       // '고정' | 'NN%' | '0%'\n    size           : x.size || '',\n    notes          : x.notes || '',\n    item_idx       : x.item_idx ?? idx,\n    total          : total,                // ★ 소계 = price × qty\n\n    supply_rate    : Number(x.supply_rate || 0),\n    supply_price   : Number(x.supply_price || 0)\n  };\n});\n\n// 3) 요약 합계\nconst items_total    = lines.reduce((s, v) => s + (v.total || 0), 0);\nconst qty_total      = lines.reduce((s, v) => s + (v.qty   || 0), 0);\nconst shipping_total = Math.ceil(qty_total / 3) * 3500; // 3개당 3,500원\nconst grand_total    = items_total + shipping_total;\n\n// 4) 최종 구조 (buyer를 group 최상단에 보존)\nreturn [{\n  json: {\n    ok: errors.length === 0,\n    errors,\n    summary: {\n      items_total,\n      shipping_total,\n      group_count: 1,\n      grand_total,\n    },\n    groups: [\n      {\n        group_idx: 0,\n        // 주문자 정보 — 비워두면 그대로 빈 값 유지\n        name:    buyer.name,\n        phone:   buyer.phone,\n        email:   buyer.email,\n        address: buyer.address,\n        memo:    buyer.memo,\n        // 아이템 배열\n        items: lines\n      }\n    ]\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        896
+      ],
+      "id": "4d0cfee5-e159-45f4-9f25-6226ed669d9e",
+      "name": "Finalize Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- FLATTEN (Run Once for All Items) ---\n// 목적: 주문자 + 아이템을 \"아이템당 1개\" 스트림으로 전개\n// - 프런트 신규 필드: discount_mode('percent'|'fixed'), discount_value, fixed_price 지원\n// - 구버전 필드: discount_rate(%)도 자동 호환\n// - URL 검증, 최소 1개 아이템 미만일 때 __abort로 중단\n\n// 0) 입력 본문 안전하게 잡기 (Webhook1에서 직접 가져옴 - Google Sheets가 중간에 있어서 변경됨)\n// [수정됨] 바로 앞 노드(Google Sheets) 데이터가 아니라, 맨 처음 Webhook1 데이터를 직접 참조합니다.\nconst webhookData = $('Webhook1').first().json;\nconst body = webhookData.body ?? webhookData;\n\nconst groups = Array.isArray(body.groups) ? body.groups : [];\n\n// 유틸\nconst toNum = (v, d=0) => {\n  const n = Number(String(v ?? '').replace(/[^\\d.-]/g,''));\n  return Number.isFinite(n) ? n : d;\n};\nconst toInt = (v, d=0) => {\n  const n = parseInt(String(v ?? '').replace(/[^\\d-]/g,''), 10);\n  return Number.isFinite(n) ? n : d;\n};\nconst pick = (obj, keys) => {\n  for (const k of keys) {\n    const v = obj?.[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\nconst out = [];\nconst errors = [];\n\ngroups.forEach((g, gi) => {\n  // 1) 주문자 정보(그룹 우선, 없으면 body에서 보강)\n  const buyer = {\n    name:    pick(g, ['name','buyer_name','customer_name','이름'])    || pick(body, ['name','buyer_name','customer_name','이름']),\n    phone:   pick(g, ['phone','tel','mobile','전화','전화번호'])      || pick(body, ['phone','tel','mobile','전화','전화번호']),\n    email:   pick(g, ['email','mail','이메일'])                       || pick(body, ['email','mail','이메일']),\n    address: pick(g, ['address','addr','주소'])                       || pick(body, ['address','addr','주소']),\n    memo:    pick(g, ['memo','note','notes','요청사항'])              || pick(body, ['memo','note','notes','요청사항']),\n  };\n\n  // 2) 아이템 전개\n  const items = Array.isArray(g?.items) ? g.items : [];\n  items.forEach((it, ii) => {\n    const url  = String(it?.product_url ?? '').trim();\n    const qty  = Math.max(1, toInt(it?.qty ?? it?.quantity ?? 1, 1));\n    const size = it?.size ?? it?.options?.size ?? it?.variant ?? it?.selectedSize ?? '';\n    const notes = it?.notes ?? '';\n\n    // 할인 필드(신버전/구버전 호환)\n    const modeRaw  = it?.discount_mode || null;                 // 'percent' | 'fixed' | null\n    const valRaw   = toNum(it?.discount_value || 0);            // 퍼센트값 또는 고정가\n    const fixedRaw = toNum(it?.fixed_price || 0);\n    const rateRaw  = (it?.discount_rate !== undefined && it?.discount_rate !== null && String(it?.discount_rate).trim() !== '')\n                      ? toInt(it?.discount_rate, 0)\n                      : null;\n\n    // 최종 정규화\n    let discount_mode   = null;   // 'percent' | 'fixed' | null\n    let discount_value  = 0;      // percent or fixed\n    let fixed_price     = 0;      // 고정가\n    let discount_rate   = null;   // % 표시용(백엔드/카드 용이성)\n\n    if (modeRaw === 'fixed' || fixedRaw > 0) {\n      discount_mode  = 'fixed';\n      fixed_price    = fixedRaw || valRaw;   // 프런트가 discount_value에 고정가를 넣는 경우 고려\n      discount_value = fixed_price;\n      discount_rate  = null;                 // 퍼센트 없음\n    } else if (modeRaw === 'percent' || rateRaw !== null) {\n      discount_mode  = 'percent';\n      discount_rate  = (modeRaw === 'percent') ? toInt(valRaw, 0) : rateRaw;\n      discount_value = discount_rate;\n    } else {\n      // 명시된 할인 없음\n      discount_mode = null;\n      discount_value = 0;\n      discount_rate = null;\n    }\n\n    // URL 검증\n    if (!/^https?:\\/\\//i.test(url)) {\n      errors.push({ message: `#${ii + 1} URL 형식 오류` });\n    }\n\n    out.push({\n      group_idx: gi,\n      item_idx: ii,\n      buyer,\n      product_url: url,\n      qty,\n      size,\n      notes,\n\n      // 할인 관련(신/구 모두 유지해 다음 노드에서 활용)\n      discount_mode,\n      discount_value,\n      fixed_price,\n      discount_rate,\n    });\n  });\n});\n\n// 3) 아이템이 하나도 없을 때: abort 플래그로 이후 노드 보호\nif (!out.length) {\n  return [{\n    json: {\n      __abort: true,\n      ok: false,\n      errors: errors.length ? errors : [{ message: '최소 1개 이상의 상품을 추가하세요.' }],\n      groups: [{ group_idx: 0, items: [] }],\n      summary: { items_total: 0, shipping_total: 0, group_count: 1, grand_total: 0 },\n    }\n  }];\n}\n\n// 4) 아이템 스트림 반환(검증 에러는 이후 단계에서 표시)\nreturn out.map(x => ({ json: x }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        896
+      ],
+      "id": "59cfe7c6-b621-4501-88ea-7d3245af99f4",
+      "name": "Flatten"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// --- Price Parse & Merge (Smart Auto Discount & Precision Crawling) ---\n// 모드: Run Once for Each Item\n\n// --- 유틸리티 ---\nfunction num(v, d = null) {\n  const n = Number(String(v ?? '').replace(/[^\\d.-]/g, ''));\n  return Number.isFinite(n) ? n : d;\n}\nfunction num0(v) { return num(v, 0); }\n\nfunction stripTags(html) {\n  return String(html ?? '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\nfunction decode(s) {\n  return String(s ?? '')\n    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\");\n}\n\n// --- 1. 이름 정밀 파싱 (불필요한 태그 완벽 제외) ---\nfunction parseName(html) {\n  let m = html.match(/<div[^>]*class=[\"'][^\"']*headingArea[^\"']*[\"'][^>]*>\\s*<h1[^>]*>([\\s\\S]*?)<\\/h1>/i);\n  if (m) return decode(stripTags(m[1])).trim(); \n  \n  m = html.match(/<h1[^>]*>([\\s\\S]*?)<\\/h1>/i);\n  if (m) return decode(stripTags(m[1])).trim();\n\n  m = html.match(/<meta[^>]+property=[\"']og:title[\"'][^>]+content=[\"']([^\"']+)[\"']/i);\n  if (m) return decode(m[1]).trim();\n\n  return '';\n}\n\n// --- 2. 브랜드명 스마트 제거 ---\nfunction cleanBrandName(name = '') {\n  const brandPattern = '(?:온유어마크|On\\\\s?Your\\\\s?Mark|onyourmark(?:-running)?\\\\.com)(?:\\\\s*(?:공식)?\\\\s*온라인\\\\s*스토어|\\\\s*스토어|\\\\s*SHOP|\\\\s*몰)?';\n  let s = String(name);\n  const prefixRe = new RegExp(`^\\\\s*${brandPattern}\\\\s*[\\\\-|–—\\\\|·•]\\\\s*`, 'i');\n  s = s.replace(prefixRe, '');\n  const suffixRe = new RegExp(`\\\\s*[\\\\-|–—\\\\|·•]\\\\s*${brandPattern}\\\\s*$`, 'i');\n  s = s.replace(suffixRe, '');\n  const parenRe = new RegExp(`\\\\s*\\\\(${brandPattern}[^)]*\\\\)\\\\s*$`, 'i');\n  s = s.replace(parenRe, '');\n  return s.replace(/\\s+/g, ' ').trim();\n}\n\n// --- 3. 상품코드 전방위 수색 (함수명 extractSKU로 통일) ---\nfunction extractSKU(html, currentName) {\n  // 1순위: 이름 안에 괄호가 있는지 확인\n  const nameMatch = currentName.match(/\\(([^)]+)\\)$/);\n  if (nameMatch) return nameMatch[1].trim();\n\n  // 패턴 A: <th> 태그와 실제 코드 사이의 거리가 멀어 못 찾는 현상 해결 (수색 거리 300자 -> 2000자로 대폭 확장)\n  let m = html.match(/<th[^>]*>\\s*(?:코드|상품코드)\\s*<\\/th>[\\s\\S]{0,2000}?<li[^>]*title=[\"']([a-zA-Z0-9_-]{4,30})[\"']/i);\n  if (m) return m[1].toUpperCase();\n\n  // 패턴 B: span 태그로 감싸진 경우도 거리 2000자로 확장\n  m = html.match(/<th[^>]*>\\s*(?:코드|상품코드)\\s*<\\/th>[\\s\\S]{0,2000}?<span[^>]*>([a-zA-Z0-9_-]{4,30})<\\/span>/i);\n  if (m) return m[1].toUpperCase();\n\n  // 패턴 C: 기존 범용 테이블 (단, option이라는 단어가 섞여 있으면 무시)\n  const tablePatterns = [\n    /<th[^>]*>\\s*(?:상품코드|코드|모델명|품번|Product\\s*Code)\\s*<\\/th>\\s*<td[^>]*>\\s*(?:<p[^>]*>)?\\s*([a-zA-Z0-9_-]{4,30})\\s*(?:<\\/p>)?\\s*<\\/td>/i,\n    /item_code\\s*=\\s*[\"']([^\"']+)[\"']/i\n  ];\n  for (const pat of tablePatterns) {\n    const match = html.match(pat);\n    if (match && !match[1].toLowerCase().includes('option')) {\n      return stripTags(match[1]).trim().toUpperCase();\n    }\n  }\n\n  // 패턴 D: url meta (최후의 보루)\n  const urlMeta = html.match(/<meta[^>]+property=[\"']og:url[\"'][^>]+content=[\"']([^\"']+)[\"']/i);\n  if (urlMeta) {\n    const url = urlMeta[1];\n    const pathPart = url.split('/product/')[1] || '';\n    const codeMatch = pathPart.match(/([a-zA-Z]{2}\\d{4,})/);\n    if (codeMatch) return codeMatch[1].toUpperCase();\n  }\n  \n  return null;\n}\n\n// --- 가격 추출 로직 ---\nconst SALE_LABELS = [\n  /할인가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /판매가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /최종결제가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /구매가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n];\nconst ORIG_LABELS = [\n  /소비자가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /정가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /원가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /판매가\\s*\\(정상가\\)[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n];\nfunction findFirstPrice(text, patterns) {\n  for (const re of patterns) {\n    const m = text.match(re);\n    if (m) return num(m[1], null);\n  }\n  return null;\n}\nfunction parseListedPrice(html) {\n  const text = stripTags(html);\n  const sale = findFirstPrice(text, SALE_LABELS);\n  if (sale) return sale;\n  const m = text.match(/(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/);\n  return m ? num(m[1], null) : null;\n}\nfunction parseOriginalPrice(html) {\n  const text = stripTags(html);\n  return findFirstPrice(text, ORIG_LABELS);\n}\n\n// ── 실행 로직 ────────────────────────────────────────\nconst html = String($json.html ?? '');\nconst idx = (typeof $itemIndex === 'number') ? $itemIndex : 0;\nconst fromFlatten = (((($items('Flatten', 0, 0) || [])[idx] || {}).json) || {});\nconst prev = { ...fromFlatten, ...$json };\n\n// 1. 이름 정밀 확보\nlet nameRaw = parseName(html);\nlet name = cleanBrandName(nameRaw);\n\n// 2. SKU 정밀 수색 및 결합 (함수명 일치 완료)\nconst foundSKU = extractSKU(html, name);\n\n// 이름에 괄호가 포함되어 있지 않다면, 찾아낸 SKU를 뒤에 붙여줌\nif (foundSKU && !name.includes(`(${foundSKU})`)) {\n  name = name.replace(/\\([^)]+\\)$/, '').trim();\n  name = `${name} (${foundSKU})`;\n}\n\n// 3. 가격 파싱\nconst listedParsed   = num0(parseListedPrice(html));   \nconst originalParsed = num0(parseOriginalPrice(html)); \n\n// 4. [할인 규칙] 구글 시트 데이터 가져오기\nlet rules = [];\ntry {\n  rules = $('Google Sheets').all().map(r => r.json);\n} catch (e) {}\n\n// 5. 가격 결정 로직\n// ✅ 웹훅 데이터에서 소속(crew_name) 정보 가져오기\nlet userCrew = '일반';\ntry {\n  const whData = $('Webhook1').first().json.body || $('Webhook1').first().json;\n  if (whData.groups && whData.groups[0] && whData.groups[0].crew_name) {\n    userCrew = String(whData.groups[0].crew_name).trim();\n  }\n} catch (e) {}\n\nconst inputMode = prev.discount_mode; \nconst inputRate = Number(prev.discount_rate || 0);\nconst inputFixed = Number(prev.fixed_price || 0);\n\nlet original_price = originalParsed || (Number.isFinite(prev.original_price) ? num0(prev.original_price) : null) || null;\nconst listed_price = listedParsed || (Number.isFinite(prev.price) ? num0(prev.price) : null) || 0;\nconst display_price = original_price || listed_price; \n\nlet final_price = listed_price;\nlet final_mode = null;\nlet final_label = '0%';\nlet final_rate = 0;\nlet match_debug = null;\n\n// ✅ 추가: 영산 공급가(기본 할인가) 저장용 변수 세팅\nlet supply_rate = 0;\nlet supply_price = listed_price;\n\n// A. 수동 모드 우선\nif (inputMode === 'fixed' && inputFixed > 0) {\n  final_price = inputFixed;\n  final_mode = 'fixed';\n  final_label = '고정';\n} else if (inputMode === 'percent' && inputRate > 0) {\n  final_price = Math.round(display_price * (1 - inputRate / 100));\n  final_mode = 'percent';\n  final_label = `${inputRate}%`;\n  final_rate = inputRate;\n} \n// B. 자동 규칙 매칭 (✅ 고객 할인가 & 영산 공급가 동시 계산)\nelse {\n  const rawTarget = (name + ' ' + (foundSKU || '') + ' ' + (prev.product_url || ''));\n  const targetStr = rawTarget.replace(/\\s+/g, '').toUpperCase(); \n  \n  const matchedRule = rules.find(rule => {\n    const keyword = String(rule.keyword || '').replace(/\\s+/g, '').toUpperCase();\n    return keyword && targetStr.includes(keyword);\n  });\n\n  if (matchedRule) {\n    const crewRateKey = `discount_rate_${userCrew}`;\n    \n    // 💡 1. 고객용 최종 할인율 (효빠님이 수정하신 || 로직 유지!)\n    const ruleRate = Number(matchedRule[crewRateKey] || matchedRule.discount_rate || 0);\n\n    // 💡 2. 영산 공급용 기본 할인율 (크루 무시하고 무조건 discount_rate만 바라봄)\n    const baseRate = Number(matchedRule.discount_rate || 0);\n    supply_rate = baseRate * 100;\n    supply_price = baseRate > 0 ? Math.round(display_price * (1 - baseRate)) : display_price;\n\n    if (ruleRate > 0) {\n      final_mode = 'auto_rule';\n      final_rate = ruleRate * 100;\n      final_price = Math.round(display_price * (1 - ruleRate));\n      \n      const hasCrewRate = Number(matchedRule[crewRateKey]) > 0;\n      final_label = hasCrewRate ? `${final_rate}% (${userCrew})` : `${final_rate}% (자동)`;\n      match_debug = `Matched: ${matchedRule.keyword}, Crew: ${userCrew}`;\n    }\n  }\n}\n\nconst price_found = Number(final_price) > 0;\n\n// ✅ 계산된 공급가 데이터를 밖으로 내보냅니다.\nreturn {\n  json: {\n    ...prev,\n    name, \n    original_price: original_price ?? null,\n    listed_price,\n    display_price,\n    price: Number(final_price || 0),\n    discount_mode: final_mode,\n    discount_label: final_label,\n    discount_rate: Number(final_rate || 0),\n    supply_rate: supply_rate,     // 👉 영산 기준 공급 할인율 추가\n    supply_price: supply_price,   // 👉 영산 기준 공급 단가 추가\n    price_found,\n    match_debug \n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        896
+      ],
+      "id": "b32ee1f8-49ea-4560-b793-4e4363047b0e",
+      "name": "Price Parse & Merge"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY",
+          "mode": "list",
+          "cachedResultName": "groupbuy_orders",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1145000552,
+          "mode": "list",
+          "cachedResultName": "discount_rules",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY/edit#gid=1145000552"
+        },
+        "options": {
+          "returnFirstMatch": false
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1056,
+        896
+      ],
+      "id": "aecc1a26-a85d-4eda-98eb-461a33a25ab2",
+      "name": "Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "g3fKC1QtYL8twF41",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"allowed\": true,\n  \"name\": \"={{ $json.이름 }}\",\n  \"crew\": \"={{ $json.소속 }}\"\n}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "6a95cc3b-4c1e-4a93-b936-bc333cd21a2c",
+      "name": "Respond: Allowed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -512,
+        1168
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"allowed\": false,\n  \"msg\": \"등록된 회원 정보가 없습니다.\"\n}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "35f0c4f6-0f46-45b3-96b7-3e08e16ada9e",
+      "name": "Respond: Denied",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        1344
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "member-auth",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "47876729-5428-4ec2-9254-0e4808a3c71d",
+      "name": "Webhook: Auth",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1216,
+        1264
+      ],
+      "webhookId": "7d96ab5c-0f17-449f-a70f-d8cf039ffdc9"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY",
+          "mode": "list",
+          "cachedResultName": "groupbuy_orders",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1670667736,
+          "mode": "list",
+          "cachedResultName": "member_list",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY/edit#gid=1670667736"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "이름",
+              "lookupValue": "={{ $node[\"Webhook: Auth\"].json.body.name.trim() }}"
+            },
+            {
+              "lookupColumn": "인증번호",
+              "lookupValue": "={{ $node[\"Webhook: Auth\"].json.body.code.toString().trim() }}"
+            }
+          ]
+        },
+        "combineFilters": "AND",
+        "options": {}
+      },
+      "id": "408b448f-6d67-4231-8636-d325d23f04cf",
+      "name": "GS: Check Member",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -1008,
+        1264
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "g3fKC1QtYL8twF41",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "23fb0a80-a3bc-480b-ad32-6f61bcf758e5",
+              "leftValue": "={{ $json.이름 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "28ffc9d6-ee6f-47b3-b475-a2e24597c1fd",
+              "leftValue": "={{ $json.소속 }}",
+              "rightValue": "={{ $node[\"Webhook: Auth\"].json.body.crew }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -800,
+        1264
+      ],
+      "id": "097427ff-67be-44dd-928d-d7f7baea9112",
+      "name": "IF: Is Member?"
+    }
+  ],
+  "pinData": {
+    "Webhook1": [
+      {
+        "json": {
+          "headers": {
+            "host": "primary-production-97a64.up.railway.app",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.1 Safari/605.1.15",
+            "content-length": "1132",
+            "accept": "*/*",
+            "accept-encoding": "gzip, deflate, br",
+            "accept-language": "ko-KR,ko;q=0.9",
+            "content-type": "application/json",
+            "origin": "null",
+            "priority": "u=3, i",
+            "referer": "https://primary-production-97a64.up.railway.app/webhook/groupbuy/form?debug=1",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+            "x-forwarded-for": "118.37.1.25",
+            "x-forwarded-host": "primary-production-97a64.up.railway.app",
+            "x-forwarded-proto": "https",
+            "x-railway-edge": "railway/asia-southeast1-eqsg3a",
+            "x-railway-request-id": "JYrvEASzRRaPvzzMAQeqjw",
+            "x-real-ip": "118.37.1.25",
+            "x-request-start": "1765712481947"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "groups": [
+              {
+                "name": "이민웅",
+                "phone": "010-5340-7947",
+                "email": "6400177@daum.net",
+                "address": "호령이",
+                "items": [
+                  {
+                    "product_url": "https://onyourmark-running.com/product/아디제로-아디오스-프로-4jp6623/4103/category/24/display/1/",
+                    "qty": 1,
+                    "size": "280",
+                    "notes": "쿨거래",
+                    "discount_mode": "percent",
+                    "discount_value": 20,
+                    "discount_rate": 20,
+                    "fixed_price": null
+                  },
+                  {
+                    "product_url": "https://onyourmark-running.com/product/아디제로-아디오스-프로-4jp6623/4103/category/24/display/1/",
+                    "qty": 1,
+                    "size": "290",
+                    "notes": "쿨거래",
+                    "discount_mode": "fixed",
+                    "discount_value": 230000,
+                    "discount_rate": null,
+                    "fixed_price": 230000
+                  },
+                  {
+                    "product_url": "https://onyourmark-running.com/product/아디제로-아디오스-프로-4jp6623/4103/category/24/display/1/",
+                    "qty": 1,
+                    "size": "250",
+                    "notes": "쿨거래",
+                    "discount_mode": "percent",
+                    "discount_value": 30,
+                    "discount_rate": 30,
+                    "fixed_price": null
+                  },
+                  {
+                    "product_url": "https://onyourmark-running.com/product/아디제로-아디오스-프로-4jp6623/4103/category/24/display/1/",
+                    "qty": 1,
+                    "size": "250",
+                    "notes": "핫거래",
+                    "discount_mode": "fixed",
+                    "discount_value": 230000,
+                    "discount_rate": null,
+                    "fixed_price": 230000
+                  }
+                ]
+              }
+            ]
+          },
+          "webhookUrl": "https://primary-production-97a64.up.railway.app/webhook/groupbuy/validate",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Flatten": [
+      {
+        "json": {
+          "group_idx": 0,
+          "item_idx": 0,
+          "buyer": {
+            "name": "이민웅",
+            "phone": "010-5340-7947",
+            "email": "elvina79@gmail.com",
+            "address": "(07558) 서울 강서구 공항대로75길 17",
+            "memo": ""
+          },
+          "product_url": "https://onyourmark-running.com/product/아드레날린-gts-25-슈퍼와이드1104544e020/4182/category/587/display/1/#none",
+          "qty": 1,
+          "size": "290",
+          "notes": "",
+          "discount_mode": "percent",
+          "discount_value": 30,
+          "fixed_price": 0,
+          "discount_rate": 30
+        }
+      }
+    ]
+  },
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Price Parse & Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Price Parse & Merge": {
+      "main": [
+        [
+          {
+            "node": "Finalize Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Flatten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: Auth": {
+      "main": [
+        [
+          {
+            "node": "GS: Check Member",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GS: Check Member": {
+      "main": [
+        [
+          {
+            "node": "IF: Is Member?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Is Member?": {
+      "main": [
+        [
+          {
+            "node": "Respond: Allowed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Denied",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4803217d-0c4c-4c0b-a08e-46dac65ffe91",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7fd757978b19dcd8436e1af70a37fbfdfbda45bd7101a8b06439992d5dd6b86d"
+  },
+  "id": "jeSIZlb03v98AgGE",
+  "tags": []
+}

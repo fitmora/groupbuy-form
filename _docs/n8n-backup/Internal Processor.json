@@ -1,0 +1,696 @@
+{
+  "name": "Internal Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "internal-order-feed",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1408,
+        112
+      ],
+      "id": "b5e4832e-e9d8-4d2c-9fce-169e2a6ca07b",
+      "name": "Webhook",
+      "webhookId": "3de6ede7-06dc-4cc0-b02e-4c279201a764"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Rows (per item)\n// 아이템 1개 = 시트 1행 생성. \"할인가격\"은 total/qty를 1순위로 사용.\n\nfunction cleanName(s) {\n  return String(s ?? '').replace(/\\s*-\\s*온유어마크 온라인 스토어$/,'').trim();\n}\nfunction toNum(v, fallback = 0) {\n  const n = Number(String(v ?? '').replace(/[^\\d.-]/g, ''));\n  return Number.isFinite(n) ? n : fallback;\n}\nfunction pick(obj, keys) {\n  for (const k of keys) {\n    const v = obj?.[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);\n  }\n  return '';\n}\n\n// ✅ $input.first() 대신 $json을 기준으로 (실행 모드에 덜 민감)\nconst data = $json || {};\nconst groups = Array.isArray(data.groups) ? data.groups : [];\n\n// 1) 아이템 배열 추정\nfunction guessItems(d, gs) {\n  for (const g of gs) if (Array.isArray(g?.items) && g.items.length) return g.items;\n  if (Array.isArray(d.items) && d.items.length) return d.items;\n  return [];\n}\n\n// 2) 주문자 정보 추정 (groups[0] 최우선)\nfunction guessBuyer(d, gs) {\n  const g0 = gs[0] || {};\n  const fromG0 = { name: g0.name, crew_name: g0.crew_name, phone: g0.phone, email: g0.email, address: g0.address, memo: g0.memo, marketing_consent: g0.marketing_consent };\n  if (Object.values(fromG0).some(v => (v ?? '') !== '')) return fromG0;\n\n  const found = d || {};\n  return {\n    name:    pick(found, ['name','buyer_name','customer_name','이름']),\n    phone:   pick(found, ['phone','tel','mobile','전화','전화번호']),\n    email:   pick(found, ['email','mail','이메일','buyer_email']),\n    address: pick(found, ['address','addr','주소','buyer_address']),\n    memo:    pick(found, ['memo','note','요청사항','buyer_memo']),\n  };\n}\n\nconst items = guessItems(data, groups);\nconst buyer = guessBuyer(data, groups);\n\n// ✅ [추가] 한국 시간 및 동의 여부 판별\nconst now = new Date();\nconst krTime = new Date(now.getTime() + (9 * 60 * 60 * 1000)).toISOString().replace('T', ' ').substring(0, 19);\nconst isConsent = buyer.marketing_consent === true;\n\nconst shippingTotal = toNum(data.summary?.shipping_total);\nconst grandTotal    = toNum(data.summary?.grand_total);\n\n// ✅ 아이템이 비어 있으면 다음 노드가 안 도니, 여기서 바로 빈 배열 반환(원인 파악용)\nif (!items.length) {\n  // 원인 확인을 위해, 최소한 1개 아이템을 만들고 싶으면 아래 return을 주석 처리하고 임시행을 넣으셔도 됩니다.\n  return [];\n}\n\nconst rows = items.map((it, idx) => {\n  const qty  = Math.max(1, toNum(it.qty ?? it.quantity, 1));\n\n  const totalNum       = toNum(it.total, 0);\n  const unitDiscounted = totalNum > 0 ? Math.round(totalNum / qty) : toNum(it.price, 0);\n\n  const hasOriginal = it.original_price != null && String(it.original_price).trim() !== '';\n  const hasListed   = it.listed_price   != null && String(it.listed_price).trim()   !== '';\n  const consumer    = hasOriginal ? toNum(it.original_price, 0)\n                   : hasListed  ? toNum(it.listed_price, 0)\n                   : '';\n\n  let discountCell = '0';\n  if (it.discount_mode === 'fixed') discountCell = '고정';\n  else if (it.discount_rate != null && String(it.discount_rate).trim() !== '') discountCell = String(Number(it.discount_rate));\n\n  const size = it.size ?? it.options?.size ?? it.option?.size ?? it.variant ?? it.selectedSize ?? '';\n\n  const itemTotal = totalNum > 0 ? totalNum : unitDiscounted * qty;\n\n  const isLast = (idx === items.length - 1);\n  const orderShippingCell = isLast ? shippingTotal : '';\n  const orderGrandCell    = isLast ? grandTotal    : '';\n\n  const noteCell = String(it.notes ?? '').trim();\n\n  return {\n    '소속'         : buyer.crew_name || '일반',\n    '이름'           : buyer.name || '',\n    '전화번호'       : buyer.phone || '',\n    '주소'           : buyer.address || '',\n    '이메일'         : buyer.email || '',\n    '상품명'         : cleanName(it.name),\n    '사이즈'         : String(size || ''), \n    '수량'           : qty,\n    '소비자가격'     : consumer,\n    '할인율'         : discountCell,\n    '할인가격'       : unitDiscounted,\n    '상품총가격'     : itemTotal,\n\n    // ✅ 영산 공급가 마진 계산용 3형제 추가!\n    '공급할인율'     : it.supply_rate ? (it.supply_rate + '%') : '',\n    '공급단가'       : it.supply_price || '',\n    '공급총가격'     : it.supply_total || '',\n\n    '총배송비'       : orderShippingCell,\n    '총가격'         : orderGrandCell,\n    '참고사항(고객)' : noteCell,\n    '마케팅 수신 동의': isConsent ? 'TRUE' : 'FALSE',\n    '동의 일시'      : isConsent ? krTime : '',\n    '주문상태'       : '입금대기',\n    '운송장번호'     : '',\n    '안내사항(관리자)': ''\n  };\n});\n\nreturn rows.map(r => ({ json: r }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -976,
+        -208
+      ],
+      "id": "9b3be883-da7f-4787-b474-15a42c72fe73",
+      "name": "Build Rows (per item)"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY",
+          "mode": "list",
+          "cachedResultName": "groupbuy_orders",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "order_list",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {
+            "이름": "={{ $json.groups[0].name }}",
+            "전화번호": "={{ $json.groups[0].phone }}",
+            "주소": "={{ $json.groups[0].address }}",
+            "상품명": "={{ $json.groups[0].items[0].name }}",
+            "사이즈": "={{ $json.groups[0].items[0].size }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "소속",
+              "displayName": "소속",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "이름",
+              "displayName": "이름",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "전화번호",
+              "displayName": "전화번호",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "주소",
+              "displayName": "주소",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "상품명",
+              "displayName": "상품명",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "사이즈",
+              "displayName": "사이즈",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "상품코드",
+              "displayName": "상품코드",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "수량",
+              "displayName": "수량",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "참고사항(고객)",
+              "displayName": "참고사항(고객)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "주문 메모",
+              "displayName": "주문 메모",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "주문상태",
+              "displayName": "주문상태",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "주문처리현황",
+              "displayName": "주문처리현황",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "운송장번호",
+              "displayName": "운송장번호",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "발송상태",
+              "displayName": "발송상태",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "이메일",
+              "displayName": "이메일",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "소비자가격",
+              "displayName": "소비자가격",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "할인율",
+              "displayName": "할인율",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "할인가격",
+              "displayName": "할인가격",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "상품총가격",
+              "displayName": "상품총가격",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "공급할인율",
+              "displayName": "공급할인율",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "공급단가",
+              "displayName": "공급단가",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "공급총가격",
+              "displayName": "공급총가격",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "총배송비",
+              "displayName": "총배송비",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "총가격",
+              "displayName": "총가격",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "안내사항(관리자)",
+              "displayName": "안내사항(관리자)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -800,
+        -80
+      ],
+      "id": "016d058b-d00e-4df2-9e8d-40fd09c419e6",
+      "name": "Append Order Rows",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "g3fKC1QtYL8twF41",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "12d2e3d4-ec95-4810-9b41-1299663a4c82",
+              "leftValue": "=={{ $json.has_buyer_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -800,
+        304
+      ],
+      "id": "29bda4a7-a75e-4b57-bab8-7281dc425362",
+      "name": "IF: Has Buyer Email"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Compose Order Summary — Run Once for Each Item\n * 입력: Finalize Response의 단일 아이템\n * 출력:\n *  - email_subject / email_html : 고객 확인용 메일 콘텐츠\n *  - buyer_*                    : 수신자 정보\n *  - has_buyer_email            : IF 노드용 \"진짜\" 불린\n *  - webhook_payload            : 사내(인커밍 웹훅) 전송용 순수 객체\n */\n\nconst data  = $json || {};\nconst group = (data.groups && data.groups[0]) || {};\nconst items = Array.isArray(group.items) ? group.items : [];\n\n// 안전 변환 유틸\nconst toNum = (v, d = 0) => {\n  const n = Number(String(v ?? '').replace(/[^\\d.-]/g, ''));\n  return Number.isFinite(n) ? n : d;\n};\nconst toStr = (v) => String(v ?? '');\n\n// 주문자\nconst buyer = {\n  name:    toStr(group.name),\n  phone:   toStr(group.phone),\n  email:   toStr(group.email),\n  address: toStr(group.address),\n  memo:    toStr(group.memo),\n};\n\n// 표기용 화폐\nconst money = (n) => Number(toNum(n, 0)).toLocaleString('ko-KR') + '원';\n\n// 이메일/웹훅용 라인 가공\nconst rows = items.map((it, i) => {\n  const discountLabel =\n    (it.discount_mode === 'fixed') ? '고정'\n    : (toNum(it.discount_rate, 0) > 0 ? `${toNum(it.discount_rate, 0)}%` : '0%');\n\n  // 표시 가격: 소비자가(정가) → 표시가(listed) → price\n  const displayPrice =\n    (it.display_price != null ? it.display_price\n      : (it.original_price ?? it.listed_price ?? it.price));\n\n  return {\n    idx:            i + 1,                 // 이메일엔 표시 안함(시트용)\n    name:           toStr(it.name),\n    url:            toStr(it.product_url),\n    display_price:  toNum(displayPrice, 0),\n    discount_label: discountLabel,\n    qty:            toNum(it.qty, 1),\n    total:          toNum(it.total, 0),\n    size:           toStr(it.size),\n    notes:          toStr(it.notes),\n  };\n});\n\nconst itemsTotal    = toNum(data.summary?.items_total, 0);\nconst shippingTotal = toNum(data.summary?.shipping_total, 0);\nconst grandTotal    = toNum(data.summary?.grand_total, 0);\n\n// 테이블 Row HTML\nconst rowHtml = rows.map(r => `\n  <tr>\n    <td class=\"left cell name\">\n      <div style=\"font-weight:600\">${r.name || '(상품명 미확인)'}</div>\n      <div class=\"sub\">\n        <a href=\"${r.url}\" target=\"_blank\" rel=\"noreferrer\" class=\"link\">상품 페이지 열기</a>\n        ${r.size ? ` · 사이즈: ${r.size}` : ''}${r.notes ? ` · 메모: ${r.notes}` : ''}\n      </div>\n    </td>\n    <td class=\"num cell\">${money(r.display_price)}</td>\n    <td class=\"center cell\">${r.discount_label}</td>\n    <td class=\"center cell\">${r.qty}</td>\n    <td class=\"num cell\">${money(r.total)}</td>\n  </tr>\n`).join('');\n\n// 이메일 본문 (반응형 스타일 포함)\nconst emailHtml = `\n  <div style=\"font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a\">\n    <style>\n      /* 기본 테이블/셀 스타일 */\n      .tbl{width:100%;border-collapse:collapse;margin-top:8px}\n      .tbl th,.tbl td{padding:10px;border-bottom:1px solid #eee;vertical-align:middle}\n      .head th{border-bottom:2px solid #e5e7eb}\n      .left{ text-align:left } .center{ text-align:center } .num{ text-align:right }\n      .sub{ font-size:12px; color:#64748b; margin-top:2px }\n      .link{ color:#0a7cff; text-decoration:none }\n      .cell{ white-space:nowrap } .name{ white-space:normal }\n      /* 열 폭(데스크톱 기준) */\n      .w-name{ width:44% } .w-price{ width:14% } .w-disc{ width:12% } .w-qty{ width:10% } .w-sub{ width:20% }\n      /* 계좌 안내: 데스크톱/모바일 토글 */\n      .acct-d{ display:inline } .acct-m{ display:none; white-space:pre-line }\n      /* 모바일 최적화 */\n      @media screen and (max-width:600px){\n        .tbl, .tbl td, .tbl th{ font-size:16px !important; line-height:1.42 }\n        .w-name,.w-price,.w-disc,.w-qty,.w-sub{ width:auto }\n        .acct-d{ display:none !important }\n        .acct-m{ display:inline !important }\n      }\n    </style>\n\n    <h2 style=\"margin:0 0 12px\">[공동구매] 주문 접수 확인</h2>\n    <p style=\"margin:0 0 6px\">주문자: <b>${buyer.name || '-'}</b></p>\n    <p style=\"margin:0 0 6px\">연락처: ${buyer.phone || '-'}</p>\n    <p style=\"margin:0 0 6px\">이메일: ${buyer.email || '-'}</p>\n    <p style=\"margin:0 0 12px\">주소: ${buyer.address || '-'}</p>\n\n    <table class=\"tbl\" cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\">\n      <thead class=\"head\">\n        <tr>\n          <th class=\"left w-name\">상품명</th>\n          <th class=\"w-price\">가격</th>\n          <th class=\"w-disc\">할인</th>\n          <th class=\"w-qty\">수량</th>\n          <th class=\"w-sub\">소계</th>\n        </tr>\n      </thead>\n      <tbody>\n        ${rowHtml || `<tr><td colspan=\"5\" class=\"center\" style=\"padding:12px;color:#64748b\">상품 없음</td></tr>`}\n      </tbody>\n      <tfoot>\n        <!-- 라벨 좌측, 금액 우측 -->\n        <tr>\n          <td colspan=\"4\" class=\"left\" style=\"padding:10px;border-top:2px solid #e5e7eb\">상품 합계</td>\n          <td class=\"num\" style=\"padding:10px;border-top:2px solid #e5e7eb\">${money(itemsTotal)}</td>\n        </tr>\n        <tr>\n          <td colspan=\"4\" class=\"left\" style=\"padding:8px;color:#64748b\">배송비</td>\n          <td class=\"num\" style=\"padding:8px;color:#64748b\">${money(shippingTotal)}</td>\n        </tr>\n        <tr>\n          <td colspan=\"4\" class=\"left\" style=\"padding:12px 10px;font-weight:700\">총 결제금액</td>\n          <td class=\"num\" style=\"padding:12px 10px;font-weight:700\">${money(grandTotal)}</td>\n        </tr>\n        <!-- 계좌 정보: PC 메일 호환을 위해 인라인 정렬 + align 속성 병행 -->\n        <tr>\n          <td colspan=\"4\" class=\"left\" style=\"padding:14px 10px 0;font-weight:700;text-align:left\">입금계좌 정보</td>\n          <td colspan=\"1\" align=\"right\" style=\"padding:14px 10px 0;text-align:right;\">\n            <span class=\"acct-d\" style=\"display:inline;\">국민은행 / 819210349569 (예금주: 이민웅)</span>\n            <span class=\"acct-m\" style=\"display:none;white-space:pre-line;\">국민은행\n819210349569\n(예금주: 이민웅)</span>\n          </td>\n        </tr>\n      </tfoot>\n    </table>\n  </div>\n`;\n\n// 인커밍 웹훅으로 넘길 안전한 객체\nconst webhook_payload = {\n  order_id: new Date().toISOString(),\n  buyer_name:    buyer.name,\n  buyer_phone:   buyer.phone,\n  buyer_email:   buyer.email,\n  buyer_address: buyer.address,\n  buyer_memo:    buyer.memo,\n  summary: {\n    items_total: itemsTotal,\n    shipping_total: shippingTotal,\n    grand_total: grandTotal,\n  },\n  items: rows, // 시트/사내 시스템용 라인 (idx 포함)\n};\n\nreturn [{\n  json: {\n    buyer_name:    buyer.name,\n    buyer_phone:   buyer.phone,\n    buyer_email:   buyer.email,\n    buyer_address: buyer.address,\n    has_buyer_email: !!(buyer.email && buyer.email.trim().match(/^[^@\\s=]+@[^@\\s=]+\\.[^@\\s=]+$/)),\n    email_subject: `[공동구매] 주문 접수 – ${buyer.name || '고객'}`,\n    email_html:    emailHtml,\n    webhook_payload,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        144
+      ],
+      "id": "287ed829-3444-4ac6-bee6-4e438195b7b4",
+      "name": "Compose Order Summary"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ String($json.admin_email || 'elvina79@gmail.com').trim() }}\n",
+        "subject": "={{ `[공동구매] 새 주문 알림 - ${$json.groups?.[0]?.name || '고객'}` }}\n",
+        "emailType": "text",
+        "message": "={{\n  '새 주문 접수\\n'\n  + '고객: ' + ($json.buyer_name || '-') + '\\n'\n  + '수량 합계: ' + ($json.webhook_payload.items.reduce((s,i)=> s + (Number(i.qty)||0), 0)) + '개\\n'\n  + '결제 예정: ' + (Number($json.webhook_payload.summary.grand_total || 0).toLocaleString()) + '원\\n'\n  + (($json.webhook_payload.items[0]) ? '첫 품목: ' + $json.webhook_payload.items[0].name : '')\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -800,
+        112
+      ],
+      "id": "34b4fe06-a34f-4ae1-8989-31bf6386fa11",
+      "name": "Admin message",
+      "webhookId": "16a35f32-6088-45d0-9160-c1a1cb46f290",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4DBLtC9LqkmFakml",
+          "name": "gmail-mora-prod"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.buyer_email }}",
+        "subject": "={{$json.email_subject}}",
+        "message": "={{ $json.email_html }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -592,
+        288
+      ],
+      "id": "19543da7-d56a-47b3-9a8a-e09748a7dca0",
+      "name": "Gmail: Send Order Confirmation",
+      "webhookId": "9e58e3ad-8697-44ac-a78f-19b72619418c",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4DBLtC9LqkmFakml",
+          "name": "gmail-mora-prod"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize Submit Payload (Universal Fix)\n// 입력: Webhook Body (Array/Object 모두 호환)\n// 출력: Finalize Response 구조 + 시트/이메일용 데이터 완벽 보정\n\nconst inputData = $json || {};\n// n8n Webhook 구조에 따라 body가 감싸져 있을 수도 있고 아닐 수도 있음\nconst p = inputData.body || inputData; \n\n// [유틸] 객체든 배열이든 무조건 배열로 변환하는 함수\nconst toArray = (data) => {\n  if (Array.isArray(data)) return data;\n  if (data && typeof data === 'object') return Object.values(data);\n  return [];\n};\n\n// [유틸] 값 안전하게 찾기\nconst pick = (obj1, obj2, keys) => {\n  for (const k of keys) {\n    const v = obj1?.[k] || obj2?.[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\n// 1. Groups 추출 (객체/배열 자동 호환)\nconst groups = toArray(p.groups);\nconst firstGroup = groups[0] || {};\n\n// 2. Items 추출 (가장 중요한 부분: 어디에 숨어있든 찾아냄)\nlet rawItems = [];\n\n// 우선순위 1: groups[0] 안의 items\nif (firstGroup.items) {\n  rawItems = toArray(firstGroup.items);\n}\n// 우선순위 2: 최상위(root)의 items (fallback)\nif (rawItems.length === 0 && p.items) {\n  rawItems = toArray(p.items);\n}\n\n// 3. Buyer 정보 추출\nconst buyer = {\n  name:    pick(p, firstGroup, ['buyer_name', 'name', 'customer_name', '이름']),\n  crew_name: pick(p, firstGroup, ['crew_name', 'crew']),\n  phone:   pick(p, firstGroup, ['buyer_phone', 'phone', 'tel', 'mobile', '전화번호']),\n  email:   pick(p, firstGroup, ['buyer_email', 'email', 'mail', '이메일']),\n  address: pick(p, firstGroup, ['buyer_address', 'address', 'addr', '주소']),\n  memo:    pick(p, firstGroup, ['buyer_memo', 'memo', 'note', 'notes', '요청사항']),\n  marketing_consent: firstGroup.marketing_consent === true || p.marketing_consent === true,\n};\n\n// 4. Items 매핑 및 가격 보정\nconst mapped = rawItems.map((it, idx) => {\n  // 숫자 안전 변환\n  const original = Number(it.original_price || 0);\n  const listed   = Number(it.listed_price || 0);\n  const total    = Number(it.total || 0);\n  const price    = Number(it.price || 0);\n  const qty      = Number(it.qty || it.quantity || 1);\n  \n  // 단가 추정 (Total이 있으면 역산, 아니면 listed 사용)\n  let unitPrice = price;\n  if (unitPrice === 0 && total > 0) unitPrice = Math.round(total / qty);\n  if (unitPrice === 0) unitPrice = listed; \n  if (unitPrice === 0 && original > 0) unitPrice = original; // 최후의 수단\n\n  // [핵심] 시트/이메일에 표시할 가격 결정\n  // original(소비자가)이 없으면 -> listed(판매가) -> unitPrice 순으로 채움\n  const finalOriginalPrice = original > 0 ? original : (listed > 0 ? listed : unitPrice);\n  const finalDisplayPrice  = Number(it.display_price) > 0 ? Number(it.display_price) : finalOriginalPrice;\n\n  return {\n    item_idx: idx,\n    // [중요] 이름이 없으면 URL이라도 넣어서 확인 가능하게 함\n    name: it.name || it.product_name || '상품명 확인불가', \n    product_url: it.url || it.product_url || '',\n    qty: qty,\n    size: it.size || it.option?.size || '',\n    notes: it.notes || '',\n\n    display_price: finalDisplayPrice,\n    original_price: finalOriginalPrice, \n    listed_price: listed,\n\n    discount_mode: (it.discount_label === '고정' || it.discount_mode === 'fixed') ? 'fixed' : 'percent',\n    discount_label: it.discount_label || (it.discount_rate ? it.discount_rate + '%' : '0%'),\n    discount_rate: (String(it.discount_label || '').includes('%'))\n      ? Number(String(it.discount_label).replace('%','')) \n      : Number(it.discount_rate || 0),\n\n    total: total > 0 ? total : (unitPrice * qty),\n    price: unitPrice,\n\n    // ✅ 영산 공급가 데이터 안전하게 추가 및 공급총액 계산\n    supply_rate: Number(it.supply_rate || 0),\n    supply_price: Number(it.supply_price || 0),\n    supply_total: Number(it.supply_price || 0) * qty,\n  };\n});\n\n// 5. Summary 계산\nlet s = p.summary || {};\nlet items_total = Number(s.items_total || p.items_total || 0);\nlet shipping_total = Number(s.shipping_total || p.shipping_total || 0);\nlet grand_total = Number(s.grand_total || p.grand_total || 0);\n\n// 만약 summary가 0원이면 items 기반으로 강제 재계산\nif (grand_total === 0 && mapped.length > 0) {\n  items_total = mapped.reduce((acc, curr) => acc + curr.total, 0);\n  shipping_total = Math.ceil(mapped.reduce((acc, curr) => acc + curr.qty, 0) / 3) * 3500;\n  grand_total = items_total + shipping_total;\n}\n\nconst summary = {\n  items_total,\n  shipping_total,\n  grand_total,\n  group_count: 1,\n};\n\nreturn [{\n  json: {\n    ok: true,\n    errors: [],\n    summary,\n    groups: [{\n      group_idx: 0,\n      ...buyer,\n      items: mapped,\n    }]\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        112
+      ],
+      "id": "8e0daf3c-6ceb-4d32-a5da-63e486f61b3d",
+      "name": "Normalize Submit Payload"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"주문이 접수되었습니다.\",\n  \"order_id\": \"{{$now.toISO()}}\"\n}\n",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -592,
+        -80
+      ],
+      "id": "04073046-4e3e-4dd3-84b8-0e594614faf6",
+      "name": "Respond to Webhook",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fe50e862-50b2-4094-b3da-0370c7f94968",
+              "leftValue": "={{ $json.groups[0].marketing_consent }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1104,
+        448
+      ],
+      "id": "67137079-0139-4a3d-9258-6a86b7aa75df",
+      "name": "IF: 마케팅 동의함?"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY",
+          "mode": "list",
+          "cachedResultName": "groupbuy_orders",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 734171974,
+          "mode": "list",
+          "cachedResultName": "WEECL_CRM",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY/edit#gid=734171974"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "이름": "={{ $json.groups[0].name }}",
+            "연락처": "={{ $json.groups[0].phone }}",
+            "이메일 ": "={{ $json.groups[0].email }}",
+            "소속": "={{ $json.groups[0].crew_name }}",
+            "동의일시": "={{ $now.setZone('Asia/Seoul').toFormat('yyyy-MM-dd HH:mm:ss') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "이름",
+              "displayName": "이름",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "연락처",
+              "displayName": "연락처",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "이메일 ",
+              "displayName": "이메일 ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "소속",
+              "displayName": "소속",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "동의일시",
+              "displayName": "동의일시",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -800,
+        448
+      ],
+      "id": "41127967-d4f9-4b88-b0a2-fde2e5516f23",
+      "name": "WEECL_CRM 적재",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "g3fKC1QtYL8twF41",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Submit Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Rows (per item)": {
+      "main": [
+        [
+          {
+            "node": "Append Order Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Has Buyer Email": {
+      "main": [
+        [
+          {
+            "node": "Gmail: Send Order Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Order Summary": {
+      "main": [
+        [
+          {
+            "node": "IF: Has Buyer Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Admin message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Submit Payload": {
+      "main": [
+        [
+          {
+            "node": "Compose Order Summary",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "IF: 마케팅 동의함?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Rows (per item)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Order Rows": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "IF: 마케팅 동의함?": {
+      "main": [
+        [
+          {
+            "node": "WEECL_CRM 적재",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fbde3795-247b-4c61-bd22-3eee634264c0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7fd757978b19dcd8436e1af70a37fbfdfbda45bd7101a8b06439992d5dd6b86d"
+  },
+  "id": "uDQywnGUPHe9PDCq",
+  "tags": []
+}

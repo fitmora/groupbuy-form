@@ -1,0 +1,1001 @@
+{
+  "name": "KREAM 리셀 분석기",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -22896,
+        5056
+      ],
+      "id": "b738b963-49de-4f00-86f9-a20ebec709b2",
+      "name": "Telegram Trigger",
+      "webhookId": "93b4363d-7521-40b0-be84-49ee308240f7",
+      "credentials": {
+        "telegramApi": {
+          "id": "JzKrZuk9y7HNc3kJ",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "check-ready",
+              "leftValue": "={{ $json.total_count }}",
+              "rightValue": 3,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -22400,
+        5200
+      ],
+      "id": "b3f738e7-99c0-44ac-aa41-49596fe11550",
+      "name": "If: 3장 수집 완료"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.msg || $json.telegramSummary || '오류가 발생했습니다.' }}",
+        "additionalFields": {}
+      },
+      "id": "140d827e-d643-415c-b1b6-2705ffe8aef9",
+      "name": "Telegram: 에러 알림",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -20800,
+        5200
+      ],
+      "webhookId": "43952915-aed4-4d0a-99a0-064b9a24ac52",
+      "credentials": {
+        "telegramApi": {
+          "id": "83C3EfcRYvhzUc7r",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/getFile?file_id={{$json.fileId}}",
+        "options": {}
+      },
+      "id": "5b028121-4eed-42c8-a6d2-b33924e704b6",
+      "name": "HTTP: 경로 가져오기",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -21920,
+        5008
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.telegram.org/file/bot{{$env.TELEGRAM_BOT_TOKEN}}/{{$json.result.file_path}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "a3984927-bdd6-42bf-acd1-4354b348f103",
+      "name": "HTTP: 이미지 다운로드",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -21712,
+        5008
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nif (!items || items.length === 0) return [];\n\n// 1. 소중한 chatId 원본 보호\nconst splitItems = $items(\"Code: 파일ID 분할\");\nconst firstSplit = splitItems[0]?.json || {};\n\nconst resultJson = {\n  isMergeSuccess: true,\n  chatId: firstSplit.chatId || '',\n  caption: firstSplit.caption || '',\n  mediaGroupId: firstSplit.mediaGroupId || ''\n};\n\n// 2. 스마트 MIME 판독기\nfunction getMime(bin) {\n  if (bin.mimeType && bin.mimeType !== 'application/octet-stream') return bin.mimeType;\n  const ext = (bin.fileExtension || '').toLowerCase();\n  const name = (bin.fileName || '').toLowerCase();\n  if (ext === 'png' || name.includes('.png')) return 'image/png';\n  if (ext === 'webp' || name.includes('.webp')) return 'image/webp';\n  return 'image/jpeg';\n}\n\nlet validImageCount = 0;\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  const splitJson = splitItems[i]?.json || {};\n  const idx = splitJson.index; // 1, 2, 3\n  \n  if (!item.binary || !item.binary.data) continue;\n  \n  try {\n    // 3. n8n Filesystem 모드 버그 완벽 우회 (진짜 Base64 강제 추출)\n    const buffer = await this.helpers.getBinaryDataBuffer(i, 'data');\n    const base64String = buffer.toString('base64');\n    \n    resultJson[`base64_${idx}`] = base64String;\n    resultJson[`mime${idx}`] = getMime(item.binary.data);\n    validImageCount++;\n  } catch (error) {\n    console.log(\"Buffer extract error:\", error);\n  }\n}\n\n// 4. 사진 3장 정상 병합 확인\nif (validImageCount !== 3) {\n  return [{\n    json: {\n      isMergeSuccess: false,\n      isError: true,\n      chatId: firstSplit.chatId || '',\n      telegramSummary: '❗️이미지 병합 실패. 다시 전송해주세요.'\n    }\n  }];\n}\n\n// 5. 바이너리(파일) 덩어리를 버리고, 깨끗한 JSON 텍스트만 통과시킵니다.\nreturn [{\n  json: resultJson\n}];"
+      },
+      "id": "38059a4d-62a5-4488-8486-6e301c04631e",
+      "name": "Code: 이미지 병합",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -21520,
+        5008
+      ],
+      "executeCode": "const splitData = $items(\"Code: 파일ID 분할\")[0].json;\nconst resultJson = { isMergeSuccess: true, chatId: splitData.chatId || '', mediaGroupId: splitData.mediaGroupId || '' };\nconst binaryData = {};\nconst items = $input.all();\n\nfor (const item of items) {\n  const idx = item.json.index;\n  const bin = item.binary?.data;\n  if (!bin || !idx) continue;\n  binaryData[`image${idx}`] = bin;\n  resultJson[`mime${idx}`] = bin.mimeType || 'image/png';\n}\n\nif (Object.keys(binaryData).length !== 3) {\n  return [{ json: { isMergeSuccess: false, isError: true, chatId: splitData.chatId || '', telegramSummary: '❗️이미지 병합 실패. 다시 전송해주세요.' } }];\n}\nreturn [{ json: resultJson, binary: binaryData }];"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "check-merge",
+              "leftValue": "={{ $json.isMergeSuccess }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -21312,
+        5008
+      ],
+      "id": "d277818a-52e7-42f5-850b-ca07212ab918",
+      "name": "If: 병합 정상 확인"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={{$env.GEMINI_API_KEY}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"generationConfig\": {\n    \"temperature\": 0.1,\n    \"topK\": 20,\n    \"topP\": 0.9,\n    \"maxOutputTokens\": 8192,\n    \"responseMimeType\": \"application/json\"\n  },\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"inlineData\": {\n            \"mimeType\": \"{{ $json.mime1 }}\",\n            \"data\": \"{{ $json.base64_1 }}\"\n          }\n        },\n        {\n          \"inlineData\": {\n            \"mimeType\": \"{{ $json.mime2 }}\",\n            \"data\": \"{{ $json.base64_2 }}\"\n          }\n        },\n        {\n          \"inlineData\": {\n            \"mimeType\": \"{{ $json.mime3 }}\",\n            \"data\": \"{{ $json.base64_3 }}\"\n          }\n        },\n        {\n          \"text\": \"당신은 KREAM 호가창 JSON 추출기입니다. 당신의 임무는 제공된 3장의 이미지에서 상품 식별 정보와 사이즈별 판매호가/구매호가/최근체결 데이터를 최대 5개까지 정확히 추출하여 JSON 객체 하나만 반환하는 것입니다.\\n\\n사용자 캡션 원문:\\n{{ $json.caption }}\\n\\n매우 중요:\\n- 첫 번째 이미지는 판매 입찰 화면입니다.\\n- 두 번째 이미지는 구매 입찰 화면입니다.\\n- 세 번째 이미지는 체결 거래 화면입니다.\\n- 절대 이 3개 역할을 서로 바꾸지 마세요.\\n- 첫 번째 이미지에서는 sell_quotes_top만 채우고, buy_quotes_top / recent_trades는 해당 이미지 기준으로 절대 추출 근거로 사용하지 마세요.\\n- 두 번째 이미지에서는 buy_quotes_top만 채우고, sell_quotes_top / recent_trades는 해당 이미지 기준으로 절대 추출 근거로 사용하지 마세요.\\n- 세 번째 이미지에서는 recent_trades만 채우고, sell_quotes_top / buy_quotes_top는 해당 이미지 기준으로 절대 추출 근거로 사용하지 마세요.\\n\\n중요 규칙:\\n1. 반드시 JSON 객체만 출력하세요. 설명문, 마크다운, 코드블록, 주석 절대 금지.\\n2. 제공된 3장의 이미지는 위 순서대로 판매 입찰 / 구매 입찰 / 체결 거래 화면이므로, 역할을 추측하거나 바꾸지 말고 고정된 역할로만 해석하세요.\\n3. 보이지 않는 값은 절대 추측하지 마세요. 보이면 추출하고, 불명확하면 null 또는 빈 배열([])로 두세요.\\n4. 가격(price)은 반드시 정수 숫자로만 출력하세요. 쉼표, 원, 공백 제거.\\n5. 수량(qty)은 화면에 명확히 보일 때만 정수로 출력하고, 보이지 않거나 애매하면 null로 출력하세요.\\n6. date_text는 화면에 보이는 원문 그대로 넣으세요. 예: \\\"오늘\\\", \\\"어제\\\", \\\"2일 전\\\", \\\"3시간 전\\\".\\n7. 판매호가(sell_quotes_top)는 첫 번째 이미지에서만, 화면에 보이는 최상단부터 최대 5개 추출하세요. 일반적으로 낮은 가격순입니다.\\n8. 구매호가(buy_quotes_top)는 두 번째 이미지에서만, 화면에 보이는 최상단부터 최대 5개 추출하세요. 일반적으로 높은 가격순입니다.\\n9. 최근체결(recent_trades)은 세 번째 이미지에서만, 화면상 최상단(가장 최신)부터 최대 5개를 추출하세요.\\n10. 최근체결은 반드시 date_text가 함께 보일 때만 추출하세요. 날짜/시간 문구가 불명확하면 recent_trades에 넣지 마세요.\\n11. 사용자 캡션에 특정 사이즈가 보이면 그 사이즈를 우선 추출하되, 해당 사이즈 데이터가 없으면 화면에 보이는 전체 사이즈를 추출하세요.\\n12. product_name은 이미지에서 확인 가능한 상품명 또는 상품 식별명을 넣으세요. 캡션 전체 문장을 그대로 넣지 마세요.\\n13. caption_raw에는 사용자 캡션 원문을 그대로 넣으세요.\\n14. caption_product_code는 사용자 캡션에서 5자리 이상 연속 숫자가 보일 때만 문자열로 넣고, 없으면 null로 두세요.\\n15. target_sizes_requested는 사용자 캡션에서 인식 가능한 사이즈만 문자열 배열로 넣고, 없으면 빈 배열([])로 두세요.\\n16. target_margin_requested는 사용자 캡션에서 '3만원', '3.5만원', '목표 50000', '목표마진 50000', '마진 50000' 형태가 보일 때만 숫자로 넣고, 없으면 null로 두세요.\\n17. 사이즈 숫자는 매우 중요합니다. 특히 290과 295를 혼동하지 마세요. 마지막 숫자가 불명확하면 추측하지 말고 notes에 \\\"size_unclear\\\"를 넣고 size_confidence를 낮추세요.\\n18. size_confidence와 parse_confidence는 0~1 사이 숫자로만 출력하세요.\\n19. 절대 없는 데이터를 억지로 생성하지 마세요.\\n\\n반드시 아래 스키마 형태의 JSON 객체 하나만 반환하세요.\\n\\n{\\n  \\\"product_name\\\": \\\"string or null\\\",\\n  \\\"caption_raw\\\": \\\"{{ $json.caption }}\\\",\\n  \\\"caption_product_code\\\": \\\"string or null\\\",\\n  \\\"target_sizes_requested\\\": [\\\"260\\\", \\\"280\\\"],\\n  \\\"target_margin_requested\\\": 50000,\\n  \\\"sizes\\\": [\\n    {\\n      \\\"size\\\": \\\"270\\\",\\n      \\\"sell_quotes_top\\\": [\\n        { \\\"price\\\": 368000, \\\"qty\\\": 1 },\\n        { \\\"price\\\": 369000, \\\"qty\\\": 2 }\\n      ],\\n      \\\"buy_quotes_top\\\": [\\n        { \\\"price\\\": 350000, \\\"qty\\\": 1 },\\n        { \\\"price\\\": 348000, \\\"qty\\\": 4 }\\n      ],\\n      \\\"recent_trades\\\": [\\n        { \\\"price\\\": 365000, \\\"date_text\\\": \\\"오늘\\\", \\\"qty\\\": null },\\n        { \\\"price\\\": 360000, \\\"date_text\\\": \\\"2일 전\\\", \\\"qty\\\": null }\\n      ],\\n      \\\"size_confidence\\\": 0.9,\\n      \\\"notes\\\": []\\n    }\\n  ],\\n  \\\"global_notes\\\": [],\\n  \\\"parse_confidence\\\": 0.9\\n}\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "35e890c2-6df4-45f6-ba64-0a9a238c1af9",
+      "name": "HTTP: Gemini (상품/시세 추출)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -21104,
+        4928
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "15XmeU6URMacvMkLuihtaQmkSFZ1ArbYTW4b90tS3PKs"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "단가표",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "8510b8c3-640f-47ea-98b0-dd23bbc3bdb7",
+      "name": "Google Sheets (단가표 로드)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [
+        -20896,
+        4928
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "g3fKC1QtYL8twF41",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "check-success",
+              "leftValue": "={{ $json.isError }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -20480,
+        4928
+      ],
+      "id": "de532af9-256a-4ac0-a416-7173f4d61752",
+      "name": "If: 정상 파싱 확인"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "15XmeU6URMacvMkLuihtaQmkSFZ1ArbYTW4b90tS3PKs"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "분석로그",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "상품명",
+              "displayName": "상품명",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "사이즈",
+              "displayName": "사이즈",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "영산공급가",
+              "displayName": "영산공급가",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "매입물류비",
+              "displayName": "매입물류비",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "크림물류비",
+              "displayName": "크림물류비",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "계",
+              "displayName": "계",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "목표마진",
+              "displayName": "목표마진",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "구매입찰가",
+              "displayName": "구매입찰가",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "판매입찰가",
+              "displayName": "판매입찰가",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "최근체결가",
+              "displayName": "최근체결가",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "목표입찰가",
+              "displayName": "목표입찰가",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "추천실행가",
+              "displayName": "추천실행가",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "예상정산액",
+              "displayName": "예상정산액",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "최종마진",
+              "displayName": "최종마진",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "판정",
+              "displayName": "판정",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "태그",
+              "displayName": "태그",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "체결가능성",
+              "displayName": "체결가능성",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "사유",
+              "displayName": "사유",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "실행유형",
+              "displayName": "실행유형",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "분석버전",
+              "displayName": "분석버전",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "chatId",
+              "displayName": "chatId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "mediaGroupId",
+              "displayName": "mediaGroupId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "9a132372-5a4f-41bf-8089-824b4e98393a",
+      "name": "Google Sheets (Append 결과)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.3,
+      "position": [
+        -20256,
+        4816
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "g3fKC1QtYL8twF41",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nif (!items || items.length === 0) return [];\n\nconst first = items.find(i => i.json.telegramSummary && i.json.chatId);\n\nif (first) {\n  return [{\n    json: {\n      chatId: first.json.chatId,\n      telegramSummary: first.json.telegramSummary\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    chatId: items[0]?.json?.chatId || '',\n    telegramSummary: '❗️요약 생성 실패'\n  }\n}];"
+      },
+      "id": "b7c2c4d1-3743-4830-96ec-fd7095887870",
+      "name": "Code: 단일 요약 추출",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20256,
+        5024
+      ],
+      "executeCode": "const items = $input.all();\nconst first = items.find(i => i.json.telegramSummary && i.json.chatId);\nif (first) return [{ json: { chatId: first.json.chatId, telegramSummary: first.json.telegramSummary } }];\nreturn [{ json: { chatId: items[0]?.json?.chatId || '', telegramSummary: '❗️요약 생성 실패' } }];"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.telegramSummary || $json.msg || '응답 생성 실패' }}",
+        "additionalFields": {}
+      },
+      "id": "a9cf10e3-71e8-4962-a6ed-9700c9cbec85",
+      "name": "Telegram: 브리핑 전송",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -20032,
+        5024
+      ],
+      "webhookId": "edbff526-c507-40c8-b20c-7d0da2cc32f1",
+      "credentials": {
+        "telegramApi": {
+          "id": "83C3EfcRYvhzUc7r",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE IF NOT EXISTS kream_album_buffer (\n  id SERIAL PRIMARY KEY,\n  chat_id TEXT NOT NULL,\n  media_group_id TEXT NOT NULL,\n  file_id TEXT NOT NULL,\n  caption TEXT,\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  processed_at TIMESTAMPTZ\n);\n\nCREATE UNIQUE INDEX IF NOT EXISTS ux_kream_album_unique\nON kream_album_buffer (chat_id, media_group_id, file_id);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -22800,
+        5424
+      ],
+      "id": "e03f216f-fe8f-4946-918d-9ad55a11e291",
+      "name": "kream_album_buffer",
+      "credentials": {
+        "postgres": {
+          "id": "l9AJSKAhKe8cFosH",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "kream_album_buffer",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chat_id": "={{ $json.message.chat.id }}",
+            "media_group_id": "={{ $json.message.media_group_id }}",
+            "file_id": "={{ $json.message.photo.pop().file_id }}",
+            "caption": "={{ $json.message.caption || '' }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "chat_id",
+              "displayName": "chat_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "media_group_id",
+              "displayName": "media_group_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "file_id",
+              "displayName": "file_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "caption",
+              "displayName": "caption",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "processed_at",
+              "displayName": "processed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "skipOnConflict": true
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -22720,
+        5040
+      ],
+      "id": "8a9c2af2-2351-42d8-9f27-efc8dea42730",
+      "name": "DB: 사진 정보 기록",
+      "credentials": {
+        "postgres": {
+          "id": "l9AJSKAhKe8cFosH",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT *, \n       (SELECT COUNT(*) FROM kream_album_buffer \n        WHERE media_group_id = $1) as total_count\nFROM kream_album_buffer\nWHERE media_group_id = $1\nORDER BY id ASC;",
+        "options": {
+          "queryReplacement": "={{ $node[\"Telegram Trigger\"].json.message.media_group_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -22544,
+        5040
+      ],
+      "id": "a3f5fa2d-68a6-4107-809a-abe445ff0b84",
+      "name": "DB: 앨범 완성도 조회",
+      "credentials": {
+        "postgres": {
+          "id": "l9AJSKAhKe8cFosH",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\nconst representative = allItems.find(item => item.json.caption) || allItems[0];\n\nreturn [{\n  json: {\n    chat_id: representative.json.chat_id,\n    media_group_id: representative.json.media_group_id,\n    caption: representative.json.caption,\n    file_ids: allItems.map(item => item.json.file_id)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -22272,
+        5040
+      ],
+      "id": "e9403d23-8ceb-493f-aa73-1aa9bfcb7db1",
+      "name": "Code: 데이터 단일화"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fileIds = $json.file_ids || [];\nconst chatId = $json.chat_id || '';\nconst mediaGroupId = $json.media_group_id || '';\nconst caption = $json.caption || '';\n\nreturn fileIds.map((fileId, index) => ({\n  json: {\n    fileId,\n    index: index + 1,\n    chatId,\n    mediaGroupId,\n    caption\n  }\n}));"
+      },
+      "id": "70c52a36-fc54-4cf1-982f-4778ab48bb2a",
+      "name": "Code: 파일ID 분할",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -22112,
+        5008
+      ],
+      "executeCode": "const data = $input.first().json;\nconst files = data.files || [];\nconst chatId = data.chatId || '';\nconst mediaGroupId = data.mediaGroupId || '';\nreturn files.map((fileId, index) => { return { json: { fileId, index: index + 1, chatId, mediaGroupId } }; });"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.msg || $json.telegramSummary || '❗️Gemini API 호출 제한(Rate Limit)에 걸렸습니다. 잠시 후 자동으로 재시도되거나 쿨타임이 필요합니다.' }}",
+        "additionalFields": {}
+      },
+      "id": "190e2d05-72e5-4954-8cc3-ede825f2f24f",
+      "name": "Telegram: 에러 알림1",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -21104,
+        5216
+      ],
+      "webhookId": "43952915-aed4-4d0a-99a0-064b9a24ac52",
+      "credentials": {
+        "telegramApi": {
+          "id": "83C3EfcRYvhzUc7r",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let geminiItem, mergeNode;\ntry {\n  geminiItem = $items(\"HTTP: Gemini (상품/시세 추출)\")[0];\n  mergeNode = $items(\"If: 병합 정상 확인\")[0].json;\n} catch (e) {\n  return [{\n    json: {\n      isError: true,\n      telegramSummary: '❗️이전 노드 데이터 참조 에러 발생. 다시 시도해주세요.'\n    }\n  }];\n}\n\nconst chatId = mergeNode.chatId || '';\nconst mediaGroupId = mergeNode.mediaGroupId || '';\nconst rawCaption = String(mergeNode.caption || '').trim();\nconst SYS_VERSION = 'V10.5.3 (보유가치 재설계 & 마진쿠션 프리패스)';\n\n// ---------- 1) Gemini JSON 파싱 ----------\nlet parsed;\ntry {\n  const rawText = geminiItem.json.candidates?.[0]?.content?.parts?.[0]?.text || '';\n  parsed = JSON.parse(String(rawText).replace(/```json|```/g, '').trim());\n} catch (e) {\n  return [{\n    json: {\n      isError: true,\n      chatId,\n      telegramSummary: '❗️AI 파싱 오류. 이미지를 다시 전송해주세요.'\n    }\n  }];\n}\n\nif (!parsed || !Array.isArray(parsed.sizes) || parsed.sizes.length === 0) {\n  return [{\n    json: {\n      isError: true,\n      chatId,\n      telegramSummary: '❗️사이즈 데이터를 추출하지 못했습니다.'\n    }\n  }];\n}\n\n// ---------- 2) 공통 함수 ----------\nfunction normalizeText(val) {\n  return String(val || '').replace(/\\s+/g, '').toLowerCase().trim();\n}\n\nfunction toNumber(val, def = 0) {\n  if (val === null || val === undefined || val === '') return def;\n  const num = Number(String(val).replace(/,/g, '').trim());\n  return Number.isFinite(num) ? num : def;\n}\n\nfunction safeNum(v, d = 0) {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : d;\n}\n\nfunction won(value) {\n  return Number(value || 0).toLocaleString('ko-KR');\n}\n\nfunction ceil100(value) {\n  return Math.ceil(Number(value || 0) / 100) * 100;\n}\n\nfunction floor100(value) {\n  return Math.floor(Number(value || 0) / 100) * 100;\n}\n\nfunction clampScore(n) {\n  return Math.max(0, Math.min(100, Math.round(n)));\n}\n\nfunction clamp(value, min, max) {\n  return Math.max(min, Math.min(max, value));\n}\n\nfunction tagScore(tag) {\n  if (String(tag).includes('DIAMOND')) return 6;\n  if (String(tag).includes('BLUE')) return 5;\n  if (String(tag).includes('GREEN')) return 4;\n  if (String(tag).includes('YELLOW')) return 3;\n  if (String(tag).includes('ORANGE')) return 2;\n  return 1;\n}\n\nfunction calcSettlement(price, feeMultiplier, fixedFeeWithVat) {\n  if (price <= 0) return 0;\n  return Math.ceil(((price * feeMultiplier) - fixedFeeWithVat) / 10) * 10;\n}\n\nfunction sumQty(arr = []) {\n  return arr.reduce((sum, x) => {\n    const q = x?.qty;\n    if (q === null || q === undefined || q === '') return sum + 1;\n    return sum + Math.max(1, safeNum(q, 1));\n  }, 0);\n}\n\nfunction avgPrice(arr = []) {\n  const nums = arr.map(x => safeNum(x?.price, 0)).filter(Boolean);\n  if (!nums.length) return 0;\n  return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length);\n}\n\nfunction tradeRecencyWeight(dateText) {\n  if (!dateText) return 0;\n\n  const str = String(dateText).trim();\n\n  if (str.includes('오늘') || str.includes('시간') || str.includes('분')) return 1.0;\n  if (str.includes('어제') || str.includes('1일')) return 0.8;\n  if (str.includes('2일')) return 0.6;\n  if (str.includes('3일')) return 0.45;\n  if (str.includes('4일')) return 0.3;\n\n  // 절대 날짜 형식: 26/03/10, 2026/03/10, 2026-03-10\n  const m = str.match(/^(\\d{2,4})[\\/\\-\\.](\\d{1,2})[\\/\\-\\.](\\d{1,2})$/);\n  if (m) {\n    let year = Number(m[1]);\n    const month = Number(m[2]);\n    const day = Number(m[3]);\n\n    if (year < 100) year += 2000;\n\n    const parsedDate = new Date(year, month - 1, day);\n    if (!Number.isNaN(parsedDate.getTime())) {\n      const now = new Date();\n      const diffMs = now.getTime() - parsedDate.getTime();\n      const diffDays = diffMs / (1000 * 60 * 60 * 24);\n\n      if (diffDays <= 1.5) return 1.0;\n      if (diffDays <= 3) return 0.85;\n      if (diffDays <= 7) return 0.65;\n      if (diffDays <= 14) return 0.45;\n      if (diffDays <= 30) return 0.28;\n      if (diffDays <= 60) return 0.15;\n      return 0.08;\n    }\n  }\n\n  return 0.12;\n}\n\nfunction getQuotesArray(sizeObj, sellOrBuy) {\n  if (sellOrBuy === 'sell') {\n    if (Array.isArray(sizeObj.sell_quotes_top)) return sizeObj.sell_quotes_top;\n    if (Array.isArray(sizeObj.sell_quotes)) return sizeObj.sell_quotes;\n    return [];\n  }\n  if (Array.isArray(sizeObj.buy_quotes_top)) return sizeObj.buy_quotes_top;\n  if (Array.isArray(sizeObj.buy_quotes)) return sizeObj.buy_quotes;\n  return [];\n}\n\n// ---------- 2-1) 최소 방어 로직 추가 ----------\nfunction extractRawCaptionSizes(caption) {\n  if (!caption) return [];\n  return [...new Set(\n    String(caption)\n      .replace(/[\\/|,]/g, ' ')\n      .split(/\\s+/)\n      .map(v => v.trim())\n      .filter(v => /^(2[3-9][0-9]|300)$/.test(v))\n  )];\n}\n\nfunction getSizeConflictNotes(rawCaptionSizes, ocrSizes) {\n  const notes = [];\n  for (const capSize of rawCaptionSizes) {\n    if (ocrSizes.includes(capSize)) continue;\n    const near = ocrSizes.find(o => Math.abs(Number(o) - Number(capSize)) === 5);\n    if (near) {\n      notes.push(`사이즈 충돌 감지: 캡션 ${capSize} / OCR ${near}`);\n    }\n  }\n  return notes;\n}\n\nfunction sanitizeRecentTrades(trades = []) {\n  return trades.filter(t =>\n    t &&\n    toNumber(t.price, 0) > 0 &&\n    String(t.date_text || '').trim() !== ''\n  );\n}\n\nfunction isSuspiciousPriceStructure({ buyQuote, sellQuote, recentTradeAvg }) {\n  if (buyQuote > 0 && sellQuote > 0 && buyQuote > sellQuote) return true;\n  if (recentTradeAvg > 0 && sellQuote > 0 && recentTradeAvg > sellQuote * 1.12) return true;\n  if (recentTradeAvg > 0 && buyQuote > 0 && buyQuote > recentTradeAvg * 1.15) return true;\n  return false;\n}\n\nfunction hasFreshRecentTrade(trades = []) {\n  return trades.some(t => tradeRecencyWeight(t?.date_text) >= 0.45);\n}\n\nfunction getRecentAskTradeAlignmentBonus(sellQuote, recentTrades = []) {\n  if (!(sellQuote > 0) || !Array.isArray(recentTrades) || recentTrades.length === 0) return 0;\n\n  const topTrades = recentTrades.slice(0, 3);\n  let bonus = 0;\n\n  for (const t of topTrades) {\n    const tradePrice = toNumber(t?.price, 0);\n    const weight = tradeRecencyWeight(t?.date_text);\n\n    if (tradePrice <= 0 || weight <= 0) continue;\n\n    const gap = Math.abs(sellQuote - tradePrice);\n\n    if (gap <= 1000) bonus = Math.max(bonus, weight >= 0.65 ? 22 : 16);\n    else if (gap <= 2000) bonus = Math.max(bonus, weight >= 0.65 ? 14 : 10);\n    else if (gap <= 3000) bonus = Math.max(bonus, weight >= 0.65 ? 8 : 5);\n  }\n\n  return bonus;\n}\n\n// ---------- 3) 사용자 목표마진 추출 ----------\nfunction parseUserTargetMargin(caption) {\n  if (!caption) return 0;\n  const text = String(caption).replace(/,/g, ' ').trim();\n  let m = text.match(/(\\d+(?:\\.\\d+)?)\\s*만\\s*원?/i);\n  if (m) return Math.round(Number(m[1]) * 10000);\n\n  m = text.match(/(?:목표마진|목표|마진)\\s*[:=]?\\s*(\\d{4,6})/i);\n  if (m) return Number(m[1]);\n\n  const lines = text.split(/\\n+/).map(v => v.trim()).filter(Boolean);\n  if (lines.length > 0) {\n    m = lines[lines.length - 1].match(/^(\\d{4,6})$/);\n    if (m) return Number(m[1]);\n  }\n\n  const tokens = text.split(/\\s+/).filter(Boolean);\n  if (tokens.length > 0) {\n    if (/^\\d{4,6}$/.test(tokens[tokens.length - 1])) return Number(tokens[tokens.length - 1]);\n  }\n\n  return 0;\n}\n\n// ---------- 4) 캡션 파싱 ----------\nfunction parseCaptionInfo(caption, availableSizes = []) {\n  const result = {\n    raw: caption || '',\n    productCode: '',\n    productText: '',\n    targetSizes: [],\n    userTargetMargin: parseUserTargetMargin(caption)\n  };\n\n  if (!caption) return result;\n\n  const sizeSet = new Set(availableSizes.map(v => String(v).trim().toUpperCase()));\n\n  let working = String(caption)\n    .replace(/(\\d+(?:\\.\\d+)?)\\s*만\\s*원?/gi, ' ')\n    .replace(/(?:목표마진|목표|마진)\\s*[:=]?\\s*\\d{4,6}/gi, ' ')\n    .trim();\n\n  const lineParts = working.split(/\\n+/);\n  if (lineParts.length > 0) {\n    const trimmedLast = String(lineParts[lineParts.length - 1] || '').trim();\n    if (/^\\d{4,6}$/.test(trimmedLast)) {\n      lineParts.pop();\n      working = lineParts.join(' ').trim();\n    }\n  }\n\n  const slashParts = working.split('/').map(v => v.trim()).filter(Boolean);\n  let productArea = slashParts.length >= 2 ? slashParts[0] : working;\n\n  const allTokens = working\n    .replace(/[|]/g, ' ')\n    .replace(/,/g, ' ')\n    .split(/\\s+/)\n    .map(v => v.trim())\n    .filter(Boolean);\n\n  const productTokens = productArea\n    .replace(/[|]/g, ' ')\n    .replace(/,/g, ' ')\n    .split(/\\s+/)\n    .map(v => v.trim())\n    .filter(Boolean);\n\n  const codeToken =\n    productTokens.find(t => /^\\d{5,}$/.test(t)) ||\n    allTokens.find(t => /^\\d{5,}$/.test(t));\n\n  if (codeToken) result.productCode = codeToken;\n\n  const pickedSizes = [];\n  for (const token of allTokens) {\n    const up = token.toUpperCase();\n    if (sizeSet.has(up)) pickedSizes.push(up);\n  }\n  result.targetSizes = [...new Set(pickedSizes)];\n\n  let textCandidate = working;\n  if (result.productCode) {\n    textCandidate = textCandidate.replace(new RegExp(`\\\\b${result.productCode}\\\\b`, 'g'), ' ');\n  }\n  for (const size of result.targetSizes) {\n    textCandidate = textCandidate.replace(new RegExp(`\\\\b${size}\\\\b`, 'gi'), ' ');\n  }\n\n  result.productText = textCandidate.replace(/[\\/|,]/g, ' ').replace(/\\s+/g, ' ').trim();\n  return result;\n}\n\nconst availableSizes = parsed.sizes.map(s => String(s.size || '').trim()).filter(Boolean);\nconst rawCaptionSizes = extractRawCaptionSizes(rawCaption);\nconst sizeConflictNotes = getSizeConflictNotes(rawCaptionSizes, availableSizes);\n\nconst captionInfo = parseCaptionInfo(rawCaption, availableSizes);\nconst requestedSizes = captionInfo.targetSizes;\nconst userTargetMargin = captionInfo.userTargetMargin;\n\n// ---------- 5) 상품 매칭 ----------\nconst geminiProductName = String(parsed.product_name || '').trim();\nconst matchCandidates = [...new Set([captionInfo.productCode, captionInfo.productText, geminiProductName].filter(Boolean).map(normalizeText))];\nconst priceList = $input.all().map(item => item.json);\nlet matchedRow = null;\nlet matchedKey = '';\n\nfor (const candidate of matchCandidates) {\n  matchedRow = priceList.find(row => normalizeText(row['키워드']) === candidate) ||\n               priceList.find(row => normalizeText(row['상품명']) === candidate) ||\n               priceList.find(row => {\n                 const k = normalizeText(row['키워드']);\n                 const n = normalizeText(row['상품명']);\n                 return (k && (candidate.includes(k) || k.includes(candidate))) ||\n                        (n && (candidate.includes(n) || n.includes(candidate)));\n               });\n  if (matchedRow) {\n    matchedKey = candidate;\n    break;\n  }\n}\n\nlet productName = matchedRow\n  ? (matchedRow['상품명'] || matchedKey || geminiProductName || captionInfo.productCode || rawCaption)\n  : (captionInfo.productCode || captionInfo.productText || geminiProductName || rawCaption);\n\nconst productCode = matchedRow\n  ? (matchedRow['키워드'] || captionInfo.productCode || matchedKey || '')\n  : (captionInfo.productCode || matchedKey || '');\n\nif (!matchedRow) {\n  return [{\n    json: {\n      isError: true,\n      chatId,\n      telegramSummary: `❗️[매칭 실패] 단가표에 없는 상품입니다.\\n인식명: ${productName}`\n    }\n  }];\n}\n\n// ---------- 6) 비용 구조 ----------\nconst supply = toNumber(matchedRow['영산공급가'], 0);\nconst pLog = toNumber(matchedRow['매입물류비'], 3500);\nconst kLog = toNumber(matchedRow['크림물류비'], 3500);\nconst inventoryRiskCost = toNumber(matchedRow['재고리스크비용'], 3000);\n\nconst absoluteMinMargin = Math.max(10000, toNumber(matchedRow['절대최소마진'], 10000));\nconst safeBiddingMargin = Math.max(15000, absoluteMinMargin + 5000);\nconst premiumMinMargin = Math.max(30000, toNumber(matchedRow['프리미엄최소마진'], 30000));\nconst premiumHighMargin = Math.max(50000, toNumber(matchedRow['프리미엄상단마진'], 50000));\nconst standardMidMargin = Math.max(20000, toNumber(matchedRow['일반중간마진'], 20000));\n\nconst feeMultiplier = 0.934;\nconst fixedFeeWithVat = 2750;\nconst totalCost = supply + pLog + inventoryRiskCost;\n\nif (supply <= 0) {\n  return [{\n    json: {\n      isError: true,\n      chatId,\n      telegramSummary: `❗️공급가가 0원입니다.`\n    }\n  }];\n}\n\nfunction calcMargin(price) {\n  return price <= 0 ? 0 : calcSettlement(price, feeMultiplier, fixedFeeWithVat) - totalCost - kLog;\n}\n\nfunction getPriceForMargin(targetMargin) {\n  return ceil100((targetMargin + totalCost + kLog + fixedFeeWithVat) / feeMultiplier);\n}\n\n// ---------- 7) 방어선 차등화 엔진 ----------\nfunction getDefensePriceByMarket({\n  itemClass,\n  targetPrice,\n  minDefensePrice,\n  sellQuote,\n  recentTradeAvg,\n  scarcityScore,\n  turnoverScore,\n  buyDepthScore,\n  sellPressureScore,\n  absoluteMinMargin,\n  premiumMinMargin,\n  calcMargin\n}) {\n  const basePrice = itemClass.includes('희소') ? targetPrice : Math.max(targetPrice, minDefensePrice);\n  const scoreDelta = (scarcityScore * 0.22) + (turnoverScore * 0.28) + (buyDepthScore * 0.25) - (sellPressureScore * 0.30);\n  const rawAdjustment = Math.round(scoreDelta * 60);\n  let adjustedPrice = basePrice + rawAdjustment;\n\n  if (recentTradeAvg > 0) adjustedPrice = Math.min(adjustedPrice, recentTradeAvg + (itemClass.includes('희소') ? 4000 : 2000));\n  if (sellQuote > 0) {\n    const sellCap = sellQuote - 1000;\n    if (sellCap > 0) adjustedPrice = Math.min(adjustedPrice, sellCap);\n  }\n  adjustedPrice = Math.max(adjustedPrice, minDefensePrice);\n\n  if (itemClass.includes('희소')) {\n    const premiumFloor = Math.max(\n      minDefensePrice,\n      targetPrice - (targetPrice >= getPriceForMargin(premiumMinMargin) ? 1500 : 1000)\n    );\n    adjustedPrice = Math.max(adjustedPrice, premiumFloor);\n  }\n\n  adjustedPrice = floor100(adjustedPrice);\n  if (calcMargin(adjustedPrice) < absoluteMinMargin) {\n    adjustedPrice = ceil100(Math.max(adjustedPrice, minDefensePrice));\n  }\n  return adjustedPrice;\n}\n\n// ---------- 8) 타겟 사이즈 필터 ----------\nlet workingSizes = parsed.sizes.slice();\nlet sizeFilterApplied = false;\nlet sizeFilterFallback = false;\n\nif (requestedSizes.length > 0) {\n  const filtered = parsed.sizes.filter(s => requestedSizes.includes(String(s.size || '').trim().toUpperCase()));\n  if (filtered.length > 0) {\n    workingSizes = filtered;\n    sizeFilterApplied = true;\n  } else {\n    workingSizes = parsed.sizes.slice();\n    sizeFilterFallback = true;\n  }\n}\n\n// ---------- 9) 본 계산 시작 ----------\nconst itemsToSave = [];\nconst summaryCandidates = [];\n\nfor (const s of workingSizes) {\n  const size = String(s.size || '').trim();\n  if (!size) continue;\n\n  const sellQuotesArray = getQuotesArray(s, 'sell');\n  const buyQuotesArray = getQuotesArray(s, 'buy');\n  const recentTradesArrayRaw = Array.isArray(s.recent_trades) ? s.recent_trades : [];\n  const recentTradesArray = sanitizeRecentTrades(recentTradesArrayRaw);\n\n  const buyQuote = buyQuotesArray.length > 0 ? toNumber(buyQuotesArray[0].price, 0) : 0;\n  const sellQuote = sellQuotesArray.length > 0 ? toNumber(sellQuotesArray[0].price, 0) : 0;\n  const secondSell = sellQuotesArray.length > 1 ? toNumber(sellQuotesArray[1].price, 0) : 0;\n  const thirdSell = sellQuotesArray.length > 2 ? toNumber(sellQuotesArray[2].price, 0) : 0;\n  const secondBuy = buyQuotesArray.length > 1 ? toNumber(buyQuotesArray[1].price, 0) : 0;\n\n  const recentTrade = recentTradesArray.length > 0 ? toNumber(recentTradesArray[0].price, 0) : 0;\n  const recentTradeAvg = avgPrice(recentTradesArray.slice(0, 5));\n\n  const freshRecentTradeExists = hasFreshRecentTrade(recentTradesArray);\nconst recentAskTradeAlignmentBonus = getRecentAskTradeAlignmentBonus(sellQuote, recentTradesArray);\n\nconst askOnlyIlliquid =\n  sellQuote > 0 &&\n  buyQuote <= 0 &&\n  !freshRecentTradeExists;\n\nconst ultraWideSpreadIlliquid =\n  sellQuote > 0 &&\n  buyQuote > 0 &&\n  ((sellQuote - buyQuote) / sellQuote) >= 0.22 &&\n  !freshRecentTradeExists;\n\n  const buyMargin = calcMargin(buyQuote);\n  const sellMargin = calcMargin(sellQuote);\n  const recentMargin = calcMargin(recentTrade);\n  const recentAvgMargin = calcMargin(recentTradeAvg);\n\n  const sellQtyTopSum = sumQty(sellQuotesArray.slice(0, 3));\n  const buyQtyTopSum = sumQty(buyQuotesArray.slice(0, 3));\n\n  const sellGap12 = (sellQuote > 0 && secondSell > 0) ? (secondSell - sellQuote) : 0;\n  const sellGap23 = (secondSell > 0 && thirdSell > 0) ? (thirdSell - secondSell) : 0;\n  const buyGap12 = (buyQuote > 0 && secondBuy > 0) ? (buyQuote - secondBuy) : 0;\n\n  const bidAskSpread = (sellQuote > 0 && buyQuote > 0) ? (sellQuote - buyQuote) : 0;\n  const bidAskSpreadPct = (sellQuote > 0 && buyQuote > 0) ? ((sellQuote - buyQuote) / sellQuote) : 0;\n  const askVsRecentGap = (sellQuote > 0 && recentTradeAvg > 0) ? (sellQuote - recentTradeAvg) : 0;\n  const bidVsRecentGap = (buyQuote > 0 && recentTradeAvg > 0) ? (recentTradeAvg - buyQuote) : 0;\n\n  // ---------- 과열 최저호가 감지 ----------\n  const stretchedAsk =\n    sellQuote > 0 &&\n    recentTradeAvg > 0 &&\n    sellQuote >= recentTradeAvg * 1.08;\n  \n  const mildlyStretchedAsk =\n    sellQuote > 0 &&\n    recentTradeAvg > 0 &&\n    sellQuote >= recentTradeAvg * 1.05;\n\n  const suspiciousPriceStructure = isSuspiciousPriceStructure({\n    buyQuote,\n    sellQuote,\n    recentTradeAvg\n  });\n\n  if (suspiciousPriceStructure) {\n    const rowData = {\n      isError: false,\n      timestamp: new Date().toISOString(),\n      chatId,\n      mediaGroupId,\n\n      상품명: productName,\n      상품코드: productCode,\n      사이즈: size,\n\n      영산공급가: supply,\n      매입물류비: pLog,\n      재고리스크비용: inventoryRiskCost,\n      크림물류비: kLog,\n      총원가: totalCost,\n\n      구매입찰가: buyQuote,\n      판매입찰가: sellQuote,\n      최근체결가: recentTrade,\n      최근체결평균가: recentTradeAvg,\n\n      자동목표마진: 0,\n      사용자목표마진: userTargetMargin || 0,\n      적용목표마진: 0,\n      목표방어선: 0,\n      전략목표가: 0,\n      안전선비딩마진: safeBiddingMargin,\n      베스트후보가: 0,\n\n      추천실행가: 0,\n      전략관망가: 0,\n      전략관망마진: 0,\n      예상정산액: 0,\n      최종기대마진: 0,\n\n      즉시청산가: buyQuote,\n      즉시청산마진: buyMargin,\n      방어상장가: 0,\n      방어상장마진: 0,\n      보유가치점수: 0,\n\n      리스크보정마진: 0,\n      ROI퍼센트: 0,\n\n      상품등급: '❌ 데이터충돌',\n      회전등급: '판정불가',\n\n      희소성점수: 0,\n      회전율점수: 0,\n      매물압력점수: 0,\n      수요두께점수: 0,\n      기대가치점수: 0,\n      종합점수: 0,\n\n      판정: '제외',\n      태그: '🔴 RED',\n      사유: '판매/구매/체결 화면 인식 충돌 가능성. 가격 구조 비정상으로 분석 제외',\n      실행유형: '데이터 오류 의심 / 제외',\n      분석버전: SYS_VERSION\n    };\n\n    itemsToSave.push({ json: rowData });\n    summaryCandidates.push(rowData);\n    continue;\n  }\n\n  // ---------- 회전/체결 HOT 감지 ----------\n  let isHot = false;\n  if (recentTradesArray.length > 0) {\n    const datesStr = recentTradesArray.map(t => String(t.date_text || '')).join(' ');\n    if (datesStr.includes('오늘') || datesStr.includes('시간') || datesStr.includes('분')) isHot = true;\n  }\n\n  let rotationScoreLegacy = 0;\n  if (buyQuote > 0) rotationScoreLegacy += 2;\n  if (recentTrade > 0) rotationScoreLegacy += 2;\n  if (sellQuote > 0) rotationScoreLegacy += 1;\n  if (isHot) rotationScoreLegacy += 1;\n\n  let rotationClass = '저회전';\n  if (rotationScoreLegacy >= 5) rotationClass = isHot ? '🔥HOT(초고회전)' : '고회전';\n  else if (rotationScoreLegacy >= 3) rotationClass = '중회전';\n\n  // ---------- 5대 지표 점수 산출 ----------\n  let scarcityScore = 0;\n  if (sellQuotesArray.length <= 2) scarcityScore += 30;\n  else if (sellQuotesArray.length <= 4) scarcityScore += 20;\n  else scarcityScore += 10;\n\n  if (sellQtyTopSum <= 3) scarcityScore += 30;\n  else if (sellQtyTopSum <= 7) scarcityScore += 20;\n  else scarcityScore += 10;\n\n  if (sellGap12 >= 3000) scarcityScore += 20;\n  else if (sellGap12 >= 1000) scarcityScore += 10;\n\n  if (askVsRecentGap >= 3000) scarcityScore += 20;\n  else if (askVsRecentGap >= 1000) scarcityScore += 10;\n  \n  // 최근 체결 대비 최저 판매호가가 너무 높으면 '희소'가 아니라 '과열 외톨이 호가'로 간주\n  if (stretchedAsk) scarcityScore -= 22;\n  else if (mildlyStretchedAsk) scarcityScore -= 10;\n  \n  scarcityScore = clampScore(scarcityScore);\n\n  const recencyRaw = recentTradesArray.slice(0, 5).reduce((sum, t) => sum + tradeRecencyWeight(t.date_text), 0);\n  let turnoverScore = Math.min(40, recencyRaw * 12);\n\n  if (recentTradesArray.length >= 5) turnoverScore += 25;\n  else if (recentTradesArray.length >= 3) turnoverScore += 18;\n  else if (recentTradesArray.length >= 1) turnoverScore += 10;\n\n  if (sellQuote > 0 && recentTradeAvg > 0) {\n    const gapFromTrade = Math.abs(sellQuote - recentTradeAvg);\n    if (gapFromTrade <= 2000) turnoverScore += 25;\n    else if (gapFromTrade <= 5000) turnoverScore += 15;\n    else turnoverScore += 5;\n  }\n\n if (buyQuote > 0 && recentTradeAvg > 0 && buyQuote >= recentTradeAvg * 0.97) turnoverScore += 10;\n\n// 최근 체결가와 현재 판매호가가 붙어 있으면 회전 보너스\nturnoverScore += recentAskTradeAlignmentBonus;\n\n// 매수 부재 + 최근 체결 부재는 회전 강한 감점\nif (askOnlyIlliquid) turnoverScore -= 22;\nif (ultraWideSpreadIlliquid) turnoverScore -= 12;\n\nturnoverScore = clampScore(turnoverScore);\n\n  let sellPressureScore = 0;\n  if (sellQtyTopSum >= 10) sellPressureScore += 35;\n  else if (sellQtyTopSum >= 6) sellPressureScore += 25;\n  else if (sellQtyTopSum >= 3) sellPressureScore += 15;\n  else sellPressureScore += 5;\n\n  if (sellQuotesArray.length >= 5) sellPressureScore += 20;\n  else if (sellQuotesArray.length >= 3) sellPressureScore += 12;\n\n  if (sellGap12 > 0 && sellGap12 <= 1000) sellPressureScore += 20;\n  else if (sellGap12 > 0 && sellGap12 <= 3000) sellPressureScore += 10;\n\n  if (sellGap23 > 0 && sellGap23 <= 1000) sellPressureScore += 15;\n  else if (sellGap23 > 0 && sellGap23 <= 3000) sellPressureScore += 8;\n\n  if (sellQuote > 0 && recentTradeAvg > 0 && sellQuote <= recentTradeAvg + 1000) sellPressureScore += 10;\n  sellPressureScore = clampScore(sellPressureScore);\n\n  let buyDepthScore = 0;\n  if (buyQuotesArray.length >= 5) buyDepthScore += 20;\n  else if (buyQuotesArray.length >= 3) buyDepthScore += 14;\n  else if (buyQuotesArray.length >= 1) buyDepthScore += 8;\n\n  if (buyQtyTopSum >= 8) buyDepthScore += 30;\n  else if (buyQtyTopSum >= 4) buyDepthScore += 20;\n  else if (buyQtyTopSum >= 1) buyDepthScore += 10;\n\n  const bidSupportRatio = (buyQuote > 0 && recentTradeAvg > 0) ? (buyQuote / recentTradeAvg) : 0;\n  if (bidSupportRatio >= 0.98) buyDepthScore += 30;\n  else if (bidSupportRatio >= 0.96) buyDepthScore += 20;\n  else if (bidSupportRatio >= 0.94) buyDepthScore += 10;\n\n  if (bidAskSpreadPct > 0 && bidAskSpreadPct <= 0.04) buyDepthScore += 20;\nelse if (bidAskSpreadPct > 0 && bidAskSpreadPct <= 0.07) buyDepthScore += 10;\n\nif (askOnlyIlliquid) buyDepthScore -= 18;\nif (ultraWideSpreadIlliquid) buyDepthScore -= 10;\n\nbuyDepthScore = clampScore(buyDepthScore);\n\n  // ---------- 기존 상품등급/목표마진 로직 ----------\n  const premiumSignalA = recentMargin >= premiumMinMargin;\n  const premiumSignalB = buyMargin >= absoluteMinMargin;\n  const premiumSignalC = sellMargin >= absoluteMinMargin;\n  const premiumSignalD = recentTrade > 0 && sellQuote > 0 ? recentTrade >= sellQuote * 0.97 : false;\n  const premiumHitCount = [premiumSignalA, premiumSignalB, premiumSignalC, premiumSignalD].filter(Boolean).length;\n\n  let itemClass = '🗑 가치낮음';\n  let autoTargetMargin = absoluteMinMargin;\n\n  if (recentMargin >= premiumHighMargin && premiumHitCount >= 3) {\n    itemClass = '💎 희소-강';\n    autoTargetMargin = premiumHighMargin;\n  } else if (recentMargin >= premiumMinMargin && premiumHitCount >= 2) {\n    itemClass = '🔥 희소';\n    autoTargetMargin = premiumMinMargin;\n  } else if (Math.max(recentMargin, buyMargin, sellMargin) >= standardMidMargin) {\n    itemClass = '📦 일반-상';\n    autoTargetMargin = standardMidMargin;\n  } else if (Math.max(recentMargin, buyMargin, sellMargin) >= absoluteMinMargin) {\n    itemClass = '📦 일반';\n    autoTargetMargin = absoluteMinMargin;\n  } else if (recentTrade > 0 || sellQuote > 0 || buyQuote > 0) {\n    itemClass = '🗑 가치낮음';\n    autoTargetMargin = absoluteMinMargin;\n  } else {\n    itemClass = '❔ 데이터부족';\n    autoTargetMargin = Math.max(20000, absoluteMinMargin);\n  }\n\n  const targetMargin = Math.max(autoTargetMargin, userTargetMargin || 0);\n  const targetPrice = getPriceForMargin(targetMargin);\n  const minDefensePrice = getPriceForMargin(absoluteMinMargin);\n\n  // ---------- 가격 시뮬레이션 ----------\n  let undercutBid = 0;\n  let undercutReason = '';\n\n  if (sellQuotesArray.length > 0) {\n    const topPrice = toNumber(sellQuotesArray[0].price, 0);\n    const topQty = toNumber(sellQuotesArray[0].qty, 1);\n    const secondSellPrice = secondSell || 0;\n  \n    const canUseTopAskAsScarce =\n      topQty === 1 &&\n      secondSellPrice > 0 &&\n      (secondSellPrice - topPrice >= 2000) &&\n      (\n        recentTradeAvg <= 0 ||\n        topPrice <= recentTradeAvg * 1.04\n      );\n  \n    // 최근 체결 대비 최저호가가 과열이면, 최저호가를 그대로 전략가로 쓰지 않음\n    if (stretchedAsk) {\n      undercutBid = Math.min(\n        topPrice,\n        ceil100(recentTradeAvg + 2500)\n      );\n      undercutReason = `최저호가가 최근 체결 대비 과열. 최근 체결권 기준 상한 적용 (${won(undercutBid)}원)`;\n    } else if (\n      sellPressureScore <= 40 &&\n      scarcityScore >= 60 &&\n      canUseTopAskAsScarce\n    ) {\n      undercutBid = topPrice;\n      undercutReason = `매물압력 낮음·희소성 높음. 1등 동가(${won(undercutBid)}원) 유지`;\n    } else if (canUseTopAskAsScarce) {\n      undercutBid = topPrice;\n      undercutReason = `1등 매물(1개) 허수 간주, 1등 동가(${won(undercutBid)}원) 세팅`;\n    } else {\n      undercutBid = Math.max(0, ceil100(topPrice) - 1000);\n      undercutReason = `최저 판매호가 저항 확인, -1천원 제압 (${won(undercutBid)}원)`;\n    }\n  } else if (recentTradeAvg > 0) {\n    undercutBid = ceil100(recentTradeAvg);\n    undercutReason = `경쟁 매물 없음, 최근 평균 체결가(${won(undercutBid)}원) 기준 세팅`;\n  } else {\n    undercutBid = targetPrice;\n    undercutReason = `데이터 부족, 목표 마진가 기준 세팅`;\n  }\n\n  const dynamicWaitPrice = getDefensePriceByMarket({\n    itemClass,\n    targetPrice,\n    minDefensePrice,\n    sellQuote,\n    recentTradeAvg,\n    scarcityScore,\n    turnoverScore,\n    buyDepthScore,\n    sellPressureScore,\n    absoluteMinMargin,\n    premiumMinMargin,\n    calcMargin\n  });\n\n  const undercutMargin = calcMargin(undercutBid);\n  const dynamicWaitMargin = calcMargin(dynamicWaitPrice);\n\n  let bestBidCandidate = 0;\n  let bestBidReason = '';\n\n  if (undercutBid > 0 && undercutMargin >= dynamicWaitMargin) {\n    bestBidCandidate = undercutBid;\n    bestBidReason = undercutReason;\n  } else {\n    bestBidCandidate = dynamicWaitPrice;\n    bestBidReason = `시장점수 반영 방어선 대기 (${won(dynamicWaitMargin)}원 기대)`;\n  }\n\n  let expectedFinalMargin = calcMargin(bestBidCandidate);\n  let actualExpectedMargin = expectedFinalMargin;\n\n  // ---------- V10.5.3 핵심: 보유가치점수(Hold Value Score) 재설계 ----------\n  const immediateExitPrice = buyQuote;\n  const immediateExitMargin = buyMargin;\n  const defenseListingPrice = minDefensePrice;\n  const defenseListingMargin = calcMargin(defenseListingPrice);\n\n  let holdValueScore = 0;\n\n  if (defenseListingMargin >= 40000) holdValueScore += 35;\n  else if (defenseListingMargin >= 30000) holdValueScore += 25;\n  else if (defenseListingMargin >= 20000) holdValueScore += 15;\n  else if (defenseListingMargin >= 15000) holdValueScore += 5;\n\n  if (expectedFinalMargin >= 50000) holdValueScore += 25;\n  else if (expectedFinalMargin >= 40000) holdValueScore += 15;\n  else if (expectedFinalMargin >= 30000) holdValueScore += 10;\n\n  holdValueScore += Math.round(scarcityScore * 0.20);\n  holdValueScore += Math.round((100 - sellPressureScore) * 0.15);\n  holdValueScore += Math.round(turnoverScore * 0.05);\n\n  // 최근 체결가와 현재 판매호가가 잘 붙으면 보유가치 가산\n  holdValueScore += Math.round(recentAskTradeAlignmentBonus * 0.7);\n\n  // 매수 부재 + 최근 체결 부재 고가매물은 보유가치 강등\n  if (askOnlyIlliquid) holdValueScore -= 22;\n  if (ultraWideSpreadIlliquid) holdValueScore -= 10;\n\n  holdValueScore = clampScore(holdValueScore);\n\n  const upsideExtraMargin = expectedFinalMargin - immediateExitMargin;\n\n  // ---------- 선매입 vs 선비딩 구분용 보조 조건 ----------\n  const weakBidSupport =\n    buyQuote <= 0 ||\n    buyDepthScore < 20 ||\n    (\n      recentTradeAvg > 0 &&\n      buyQuote > 0 &&\n      buyQuote < recentTradeAvg * 0.72\n    );\n  \n  const poorExitLiquidity =\n    weakBidSupport ||\n    buyQtyTopSum <= 1;\n  \n  const canPrePurchaseSafely =\n    !poorExitLiquidity &&\n    defenseListingMargin >= 18000 &&\n    holdValueScore >= 45;\n  \n  const shouldUsePreBidInstead =\n    expectedFinalMargin >= safeBiddingMargin &&\n    (\n      poorExitLiquidity ||\n      defenseListingMargin < 18000\n    );\n  \n  // ---------- 7단 운영모드 판정 ----------\n  let recommendedBid = 0;\n  let action = '';\n  let tag = '';\n  let execType = '';\n  let reason = '';\n\n  if (\n    immediateExitMargin >= 30000 &&\n    sellPressureScore <= 55 &&\n    holdValueScore >= 40 &&\n    (upsideExtraMargin >= 7000 || scarcityScore >= 60 || expectedFinalMargin >= 45000) &&\n    (freshRecentTradeExists || immediateExitMargin >= 30000)\n  ) {\n    recommendedBid = bestBidCandidate;\n    actualExpectedMargin = expectedFinalMargin;\n    execType = '3일 고가 비딩 → 미체결 시 즉시 체결';\n    action = '선매입/관망';\n    tag =\n      (expectedFinalMargin >= premiumHighMargin && (turnoverScore >= 20 || immediateExitMargin >= 30000))\n        ? '💎 DIAMOND'\n        : '🔵 BLUE';\n    reason = `즉시청산 ${won(immediateExitMargin)}원 가능. 3일 고가 비딩 후 반응 없으면 즉시 체결 전환`;\n  }\n  else if (\n  expectedFinalMargin >= 30000 &&\n  holdValueScore >= 45 &&\n  sellPressureScore <= 65 &&\n  !askOnlyIlliquid &&\n  canPrePurchaseSafely &&\n  (\n    scarcityScore >= 55 ||\n    expectedFinalMargin >= 45000 ||\n    defenseListingMargin >= 25000 ||\n    freshRecentTradeExists ||\n    recentAskTradeAlignmentBonus >= 12\n  ) &&\n  (\n    freshRecentTradeExists ||\n    immediateExitMargin >= 30000 ||\n    recentAskTradeAlignmentBonus >= 16\n  )\n) {\n  recommendedBid = bestBidCandidate;\n  actualExpectedMargin = expectedFinalMargin;\n  execType = '선매입 후 고가 관망 (마진 쿠션 확보)';\n  action = '선매입/관망';\n  tag =\n    (expectedFinalMargin >= premiumHighMargin && immediateExitMargin >= 20000)\n      ? '💎 DIAMOND'\n      : '🔵 BLUE';\n  reason = defenseListingMargin >= 20000\n    ? `고마진 + 하방방어(${won(defenseListingMargin)}원) 확보. 3~7일 고가 비딩 후 필요시 방어청산`\n    : `고마진 쿠션(${won(expectedFinalMargin)}원) 기반 관망. 3~7일 고가 비딩 후 반응 없으면 단계적 인하`;\n}\n  else if (\n    expectedFinalMargin >= 40000 &&\n    holdValueScore >= 45 &&\n    defenseListingMargin >= 18000 &&\n    !askOnlyIlliquid &&\n    (\n      scarcityScore >= 50 ||\n      sellPressureScore <= 45 ||\n      expectedFinalMargin >= 55000 ||\n      freshRecentTradeExists\n    )\n  ) {\n    recommendedBid = bestBidCandidate;\n    actualExpectedMargin = expectedFinalMargin;\n    execType = '선매입 후 시험 관망 (단계적 인하)';\n    action = '선매입/시험관망';\n    tag = '🔵 BLUE';\n    reason = `수요가 낮아도 하방방어(${won(defenseListingMargin)}원) 튼튼함. 고마진 쿠션 믿고 선매입 베팅`;\n  }\n  else if (\n    buyQuote > 0 &&\n    immediateExitMargin >= safeBiddingMargin &&\n    (\n      immediateExitMargin >= targetMargin ||\n      turnoverScore >= 60 ||\n      (\n        totalCost <= 160000 &&\n        immediateExitMargin >= 20000 &&\n        recentTradeAvg > 0\n      )\n    )\n  ) {\n    recommendedBid = buyQuote;\n    actualExpectedMargin = immediateExitMargin;\n    execType = '즉시 체결 후 발주 (무재고 타임어택)';\n    action = '즉시 체결';\n    tag = immediateExitMargin >= premiumMinMargin ? '🔵 BLUE' : '🟢 GREEN';\n    reason =\n      (totalCost <= 160000 && immediateExitMargin >= 20000 && recentTradeAvg > 0)\n        ? `저가/중가 즉시회전 예외 적용. 구매호가로 ${won(immediateExitMargin)}원 확보 후 48시간 내 발주 대응`\n        : `구매호가로 ${won(immediateExitMargin)}원 확보. 48시간 내 영산 발주 대응`;\n  }\n  else if (\n    expectedFinalMargin >= premiumMinMargin &&\n    turnoverScore >= 45 && buyDepthScore >= 35 && sellPressureScore <= 40 && scarcityScore >= 55\n  ) {\n    recommendedBid = bestBidCandidate;\n    actualExpectedMargin = expectedFinalMargin;\n    execType = '선매입 후 비딩 (재고 선확보)';\n    action = '선매입';\n    tag = '🔵 BLUE';\n    reason = `고마진 및 안전지표 충족. 재고 확보 후 비딩 (${won(actualExpectedMargin)}원 기대)`;\n  }\n  else if (\n    (\n      shouldUsePreBidInstead &&\n      recentTradeAvg > 0 &&\n      (\n        freshRecentTradeExists ||\n        recentAskTradeAlignmentBonus >= 12 ||\n        turnoverScore >= 45\n      )\n    ) ||\n    (\n      expectedFinalMargin >= safeBiddingMargin &&\n      turnoverScore >= 45 &&\n      buyDepthScore >= 25 &&\n      sellPressureScore <= 55\n    )\n  ) {\n    recommendedBid = bestBidCandidate;\n    actualExpectedMargin = expectedFinalMargin;\n    execType = '선비딩 후 체결시 발주 (무재고)';\n    action = '선비딩';\n    tag = '🟡 YELLOW';\n    reason = poorExitLiquidity\n      ? `최근 체결/판매정렬은 양호하나 현재 매수방어가 약함. 먼저 비딩 반응 확인 후 체결 시 발주 (${won(actualExpectedMargin)}원 기대)`\n      : `1.5만 컷 통과 및 회전율 양호. 무재고 덫놓기 (${won(actualExpectedMargin)}원 기대)`;\n  }\n  else {\n    recommendedBid = 0;\n    actualExpectedMargin = expectedFinalMargin;\n    execType = '관망 / 패스';\n    action = '패스';\n    if (expectedFinalMargin < safeBiddingMargin) {\n      tag = '🔴 RED';\n      reason = `기대마진(${won(expectedFinalMargin)}원) 1.5만 미만. 48시간 발주 리스크 초과`;\n    } else {\n      tag = '🟠 ORANGE';\n      reason = askOnlyIlliquid\n        ? `판매호가만 높고 최근 체결/매수세 확인 부족. 실현 가능성 낮아 패스`\n        : `마진은 나오나 하방방어/회전율 취약. 악성재고 위험으로 패스`;\n    }\n  }\n\n  // ---------- EV 점수 ----------\n  let expectedValueScore = 0;\n  if (actualExpectedMargin >= 50000) expectedValueScore += 42;\n  else if (actualExpectedMargin >= 40000) expectedValueScore += 34;\n  else if (actualExpectedMargin >= 30000) expectedValueScore += 26;\n  else if (actualExpectedMargin >= 20000) expectedValueScore += 17;\n  else if (actualExpectedMargin >= safeBiddingMargin) expectedValueScore += 7;\n\n  if (targetMargin > 0) {\n    const targetAchieveRatio = actualExpectedMargin / targetMargin;\n    if (targetAchieveRatio >= 1.0) expectedValueScore += 24;\n    else if (targetAchieveRatio >= 0.9) expectedValueScore += 16;\n    else if (targetAchieveRatio >= 0.8) expectedValueScore += 8;\n    else if (targetAchieveRatio >= 0.65) expectedValueScore += 3;\n  }\n\n  const roiPct = totalCost > 0 ? (actualExpectedMargin / totalCost) * 100 : 0;\n  if (roiPct >= 15) expectedValueScore += 18;\n  else if (roiPct >= 12) expectedValueScore += 14;\n  else if (roiPct >= 9) expectedValueScore += 10;\n  else if (roiPct >= 6) expectedValueScore += 6;\n  else if (roiPct >= 4) expectedValueScore += 2;\n\n  const liquidityModifier = clamp(\n    ((turnoverScore * 0.40) + (buyDepthScore * 0.25) + (scarcityScore * 0.15) - (sellPressureScore * 0.20)) / 100,\n    0.25,\n    0.95\n  );\n  const riskAdjustedMargin = actualExpectedMargin * liquidityModifier;\n\n  if (riskAdjustedMargin >= 50000) expectedValueScore += 16;\n  else if (riskAdjustedMargin >= 30000) expectedValueScore += 12;\n  else if (riskAdjustedMargin >= 20000) expectedValueScore += 8;\n  else if (riskAdjustedMargin >= 10000) expectedValueScore += 4;\n\n  expectedValueScore = clampScore(expectedValueScore);\n\n  // ---------- 즉시청산 보너스 추가 ----------\n  let immediateExitScore = 0;\n  if (immediateExitMargin >= 40000) immediateExitScore = 100;\n  else if (immediateExitMargin >= 30000) immediateExitScore = 85;\n  else if (immediateExitMargin >= 20000) immediateExitScore = 65;\n  else if (immediateExitMargin >= 15000) immediateExitScore = 45;\n  else if (immediateExitMargin >= 10000) immediateExitScore = 25;\n\n  let immediateRotationBonus = 0;\n  \n  // 저가/중가 상품에서 즉시 체결 가능한 회전 카드 가산\n  if (\n    buyQuote > 0 &&\n    totalCost <= 160000 &&\n    immediateExitMargin >= 20000\n  ) {\n    immediateRotationBonus += 18;\n  } else if (\n    buyQuote > 0 &&\n    totalCost <= 190000 &&\n    immediateExitMargin >= 18000\n  ) {\n    immediateRotationBonus += 10;\n  }\n  \n  // 최근 체결까지 있으면 추가 가산\n  if (\n    buyQuote > 0 &&\n    immediateExitMargin >= 20000 &&\n    recentTradeAvg > 0\n  ) {\n    immediateRotationBonus += 8;\n  }\n  \n  // 즉시 체결 실행으로 확정된 경우 한 번 더 소폭 가산\n  if (execType === '즉시 체결 후 발주 (무재고 타임어택)') {\n    immediateRotationBonus += 22;\n  }\n  \n  immediateRotationBonus = clampScore(immediateRotationBonus);\n  \n  let overallScore = clampScore(\n    scarcityScore * 0.10 +\n    turnoverScore * 0.15 +\n    (100 - sellPressureScore) * 0.15 +\n    buyDepthScore * 0.13 +\n    expectedValueScore * 0.20 +\n    holdValueScore * 0.10 +\n    immediateExitScore * 0.09 +\n    immediateRotationBonus * 0.18\n  );\n\n  // 패스 카드(ORANGE)는 실행 가능 카드와 점수 위계를 분리하기 위해 소폭 감점\n  if (tag === '🟠 ORANGE') {\n    overallScore = Math.max(0, overallScore - 6);\n  }\n  \n  const finalSettlement = calcSettlement(recommendedBid, feeMultiplier, fixedFeeWithVat);\n\n  const rowData = {\n    isError: false,\n    timestamp: new Date().toISOString(),\n    chatId,\n    mediaGroupId,\n\n    상품명: productName,\n    상품코드: productCode,\n    사이즈: size,\n\n    영산공급가: supply,\n    매입물류비: pLog,\n    재고리스크비용: inventoryRiskCost,\n    크림물류비: kLog,\n    총원가: totalCost,\n\n    구매입찰가: buyQuote,\n    판매입찰가: sellQuote,\n    최근체결가: recentTrade,\n    최근체결평균가: recentTradeAvg,\n\n    구매입찰마진: buyMargin,\n    판매입찰마진: sellMargin,\n    최근체결기준마진: recentMargin,\n    최근평균체결기준마진: recentAvgMargin,\n\n    sell_qty_top_sum: sellQtyTopSum,\n    buy_qty_top_sum: buyQtyTopSum,\n    bid_ask_spread: bidAskSpread,\n    bid_ask_spread_pct: Number(bidAskSpreadPct.toFixed(4)),\n    ask_vs_recent_gap: askVsRecentGap,\n    bid_vs_recent_gap: bidVsRecentGap,\n    buy_gap_1_2: buyGap12,\n\n    자동목표마진: autoTargetMargin,\n    사용자목표마진: userTargetMargin || 0,\n    적용목표마진: targetMargin,\n    목표방어선: minDefensePrice,\n    전략목표가: targetPrice,\n    안전선비딩마진: safeBiddingMargin,\n    베스트후보가: bestBidCandidate,\n\n    추천실행가: recommendedBid,\n    전략관망가: bestBidCandidate,\n    전략관망마진: expectedFinalMargin,\n    예상정산액: finalSettlement,\n    최종기대마진: actualExpectedMargin,\n\n    즉시청산가: immediateExitPrice,\n    즉시청산마진: immediateExitMargin,\n    방어상장가: defenseListingPrice,\n    방어상장마진: defenseListingMargin,\n    보유가치점수: holdValueScore,\n\n    리스크보정마진: Math.round(riskAdjustedMargin),\n    ROI퍼센트: Number(roiPct.toFixed(2)),\n\n    상품등급: itemClass,\n    회전등급: rotationClass,\n\n    희소성점수: scarcityScore,\n    회전율점수: turnoverScore,\n    매물압력점수: sellPressureScore,\n    수요두께점수: buyDepthScore,\n    기대가치점수: expectedValueScore,\n    종합점수: overallScore,\n\n    판정: action,\n    태그: tag,\n    사유: reason,\n    실행유형: execType,\n    분석버전: SYS_VERSION\n  };\n\n  itemsToSave.push({ json: rowData });\n  summaryCandidates.push(rowData);\n}\n\n// ---------- 10) 정렬 (실행우선순위 복구) ----------\nfunction execPriorityScore(execType) {\n  if (String(execType).includes('즉시 체결 후 발주')) return 5;\n  if (String(execType).includes('3일 고가 비딩 → 미체결 시 즉시 체결')) return 4;\n  if (String(execType).includes('선매입 후 고가 관망')) return 3;\n  if (String(execType).includes('선매입 후 시험 관망')) return 2;\n  if (String(execType).includes('선비딩 후 체결시 발주')) return 1;\n  return 0;\n}\n\nsummaryCandidates.sort((a, b) => {\n  // 1순위: 태그 점수\n  if (tagScore(b.태그) !== tagScore(a.태그)) {\n    return tagScore(b.태그) - tagScore(a.태그);\n  }\n\n  // 2순위: 실행 우선순위\n  if (execPriorityScore(b.실행유형) !== execPriorityScore(a.실행유형)) {\n    return execPriorityScore(b.실행유형) - execPriorityScore(a.실행유형);\n  }\n\n  // 3순위: 종합점수\n  if (b.종합점수 !== a.종합점수) {\n    return b.종합점수 - a.종합점수;\n  }\n\n  // 4순위: 최종 기대마진\n  return b.최종기대마진 - a.최종기대마진;\n});\n\n// ---------- 11) 텔레그램 브리핑 ----------\nlet summaryText = `📊 *KREAM 보유전략 분석 [${SYS_VERSION}]*\\n`;\nsummaryText += `*${productName}*\\n`;\nif (productCode) summaryText += `(상품코드: ${productCode})\\n`;\nsummaryText += `(원가: ${won(totalCost)}원 | 최소 안전마진: ${won(safeBiddingMargin)}원)\\n`;\n\nif (sizeConflictNotes.length > 0) {\n  summaryText += `⚠️ ${sizeConflictNotes.join(' / ')}\\n`;\n}\n\nconst globalNotes = Array.isArray(parsed.global_notes) ? parsed.global_notes.filter(Boolean) : [];\nif (globalNotes.length > 0) {\n  summaryText += `⚠️ AI 추출 주의: ${globalNotes.join(' / ')}\\n`;\n}\n\nif (userTargetMargin > 0) summaryText += `(🎯 사용자 목표마진: ${won(userTargetMargin)}원 반영)\\n`;\nif (sizeFilterApplied) summaryText += `(🔍 타겟 필터 적용: ${requestedSizes.join(', ')})\\n`;\nelse if (sizeFilterFallback) summaryText += `(⚠️ 입력한 사이즈 매물이 없어 전체 분석)\\n`;\nsummaryText += `\\n`;\n\nconst viableCandidates = summaryCandidates.filter(row => !String(row.태그).includes('RED') && !String(row.태그).includes('ORANGE'));\n\nif (viableCandidates.length === 0) {\n  summaryText += '⚠️ *[전량 패스 권고]* 해당 상품은 발주 리스크를 감수하거나 재고로 떠안을 만한 하방 방어력/안전마진을 갖춘 사이즈가 없습니다.\\n\\n';\n  for (const row of summaryCandidates.slice(0, 5)) {\n    summaryText += `🔹 *${row.사이즈}* (${row.태그})\\n`;\n    summaryText += `🏆 종합점수: *${row.종합점수}점*\\n`;\n    summaryText += `👉 실행: *${row.실행유형}*\\n`;\n    if (row.추천실행가 > 0) {\n      summaryText += `추천가: ${won(row.추천실행가)}원 | 💰 마진: *${won(row.최종기대마진)}원*\\n`;\n    } else {\n      summaryText += `관망기준가: ${won(row.전략관망가)}원 | 예상마진 기준: *${won(row.전략관망마진)}원*\\n`;\n    }\n    summaryText += `📈 지표: [희소 ${row.희소성점수}] [회전 ${row.회전율점수}] [압력 ${row.매물압력점수}] [매수두께 ${row.수요두께점수}] [EV ${row.기대가치점수}] [보유 ${row.보유가치점수}]\\n`;\n    summaryText += `(근거: ${row.사유})\\n\\n`;\n  }\n} else {\n  for (const row of summaryCandidates.slice(0, 5)) {\n    summaryText += `🔹 *${row.사이즈}* (${row.태그})\\n`;\n    summaryText += `🏆 종합점수: *${row.종합점수}점*\\n`;\n    summaryText += `👉 실행: *${row.실행유형}*\\n`;\n    if (row.추천실행가 > 0) {\n      summaryText += `추천가: ${won(row.추천실행가)}원 | 💰 마진: *${won(row.최종기대마진)}원*\\n`;\n    } else {\n      summaryText += `관망기준가: ${won(row.전략관망가)}원 | 예상마진 기준: *${won(row.전략관망마진)}원*\\n`;\n    }\n    summaryText += `📈 지표: [희소 ${row.희소성점수}] [회전 ${row.회전율점수}] [압력 ${row.매물압력점수}] [매수두께 ${row.수요두께점수}] [EV ${row.기대가치점수}] [보유 ${row.보유가치점수}]\\n`;\n    summaryText += `(근거: ${row.사유})\\n\\n`;\n  }\n}\n\nif (itemsToSave.length > 0) {\n  itemsToSave[0].json.telegramSummary = summaryText;\n}\n\nreturn itemsToSave;"
+      },
+      "id": "d5d28cd8-8bf3-4df7-97d3-0fd12543f32c",
+      "name": "Code: DB 매칭 및 V10 계산",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20704,
+        4928
+      ],
+      "executeCode": "const geminiItem = $items(\"HTTP: Gemini (상품/시세 추출)\")[0];\nconst mergeNode = $items(\"If: 병합 정상 확인\")[0].json;\nconst chatId = mergeNode.chatId || '';\nconst mediaGroupId = mergeNode.mediaGroupId || '';\nconst SYS_VERSION = 'V7.0 (DB 자동매칭)';\n\nlet parsed;\ntry {\n  const rawText = geminiItem.json.candidates?.[0]?.content?.parts?.[0]?.text || '';\n  parsed = JSON.parse(String(rawText).replace(/```json|```/g, '').trim());\n} catch (e) {\n  return [{ json: { isError: true, chatId, telegramSummary: '❗️AI 파싱 오류. 이미지를 다시 전송해주세요.' } }];\n}\n\nif (!parsed || !Array.isArray(parsed.sizes) || parsed.sizes.length === 0) {\n  return [{ json: { isError: true, chatId, telegramSummary: '❗️사이즈 데이터를 추출하지 못했습니다.' } }];\n}\n\nconst productName = String(parsed.product_name || '').trim();\nconst priceList = $input.all().map(item => item.json);\nlet matchedRow = null;\n\n// 단가표에서 상품명 유사도 매칭 (띄어쓰기 무시)\nfor (const row of priceList) {\n  const rowName = String(row['품목'] || '').replace(/\\s+/g, '').toLowerCase();\n  const pName = productName.replace(/\\s+/g, '').toLowerCase();\n  if (rowName && (pName.includes(rowName) || rowName.includes(pName))) {\n    matchedRow = row;\n    break;\n  }\n}\n\nif (!matchedRow) {\n  return [{ json: { isError: true, chatId, telegramSummary: `❗️[매칭 실패] 단가표에 없는 상품입니다.\\n\\n인식된 상품: ${productName}\\n\\n구글 시트 '단가표' 탭에 해당 상품의 영산공급가를 추가하신 뒤 다시 사진을 전송해주세요.` } }];\n}\n\nfunction toNumber(val, def = 0) {\n  if (val === null || val === undefined || val === '') return def;\n  const num = Number(String(val).replace(/,/g, '').trim());\n  return Number.isFinite(num) ? num : def;\n}\nfunction ceil100(value) { return Math.ceil(value / 100) * 100; }\nfunction won(value) { return Number(value || 0).toLocaleString('ko-KR'); }\n\nconst supply = toNumber(matchedRow['영산공급가'], 0);\nconst tMargin = toNumber(matchedRow['목표마진'], 10000);\nconst pLog = 3500; // 매입 물류비 고정\nconst kLog = 3500; // 크림 물류비 고정\n\nif (supply <= 0) return [{ json: { isError: true, chatId, telegramSummary: `❗️'단가표'에 ${productName}의 공급가가 0원입니다.` } }];\n\nconst totalCost = supply + pLog;\nconst feeMultiplier = 0.934;\nconst fixedFeeWithVat = 2750;\nconst itemsToSave = [];\nconst summaryCandidates = [];\n\nfor (const s of parsed.sizes) {\n  const size = String(s.size || '').trim();\n  if (!size) continue;\n\n  const buyQuote = toNumber(s.buy_quote, 0);\n  const sellQuote = toNumber(s.sell_quote, 0);\n  const recentTrade = toNumber(s.recent_trade, 0);\n\n  const targetBid = ceil100((totalCost + kLog + tMargin + fixedFeeWithVat) / feeMultiplier);\n\n  let recommendedBid = targetBid;\n  let tag = '🔴 레드';\n  let action = '제외';\n  let feasibility = '보통';\n  let reason = '';\n  let execType = '판매입찰 대기'; \n\n  const emptyCount = (buyQuote === 0 ? 1 : 0) + (sellQuote === 0 ? 1 : 0) + (recentTrade === 0 ? 1 : 0);\n\n  if (emptyCount >= 2) {\n    feasibility = '정보 부족';\n    action = '관망';\n    reason = '[관망-정보부족] 호가 및 체결 데이터 부족';\n  } else {\n    const instantSettlement = Math.floor(buyQuote * feeMultiplier) - fixedFeeWithVat;\n    const instantMargin = instantSettlement - totalCost - kLog;\n\n    if (buyQuote > 0 && buyQuote >= targetBid && instantMargin >= tMargin) {\n      recommendedBid = buyQuote;\n      feasibility = '즉시 체결 가능';\n      action = '즉시 진행';\n      tag = '🔵 BLUE';\n      execType = '즉시 판매';\n      reason = '[즉시진행] 구매호가가 목표가 이상';\n    } else if (sellQuote > 0 && targetBid >= sellQuote) {\n      recommendedBid = targetBid;\n      feasibility = '경쟁 매물 존재';\n      action = '관망';\n      reason = '[관망-경쟁가열] 최저 판매호가가 내 목표가보다 낮음';\n    } else {\n      recommendedBid = targetBid;\n      if (recentTrade > 0 && recommendedBid > recentTrade) {\n        feasibility = '괴리 발생';\n        action = '관망';\n        reason = '[관망-괴리발생] 추천입찰가가 최근체결가 초과';\n      } else if (sellQuote > 0 && recommendedBid >= sellQuote) {\n        feasibility = '판매호가 초과';\n        action = '관망';\n        reason = '[관망-판매호가초과] 목표입찰가가 최저 판매호가 초과';\n      } else if (buyQuote > 0 && buyQuote < targetBid) {\n        feasibility = '수익 대기';\n        action = '관망';\n        reason = '[관망-수익대기] 시장가 낮음. 목표가 덫 놓기';\n      }\n    }\n  }\n\n  const settlement = Math.floor(recommendedBid * feeMultiplier) - fixedFeeWithVat;\n  const finalMargin = settlement - totalCost - kLog;\n\n  if (action !== '즉시 진행' && action !== '관망') {\n    if (finalMargin >= 30000) {\n      tag = '🔵 BLUE';\n      action = '우선 검토';\n      reason = reason || '3만원 이상 마진 확보';\n    } else if (finalMargin >= 10000) {\n      tag = '🟢 GREEN';\n      action = '일반 비딩';\n      reason = reason || '1만원 이상 마진 확보';\n    } else {\n      tag = '🔴 레드';\n      action = '제외';\n      feasibility = '낮음';\n      reason = reason || '최소 마진 미달';\n    }\n  } else if (action === '관망') {\n    tag = finalMargin >= 10000 ? '🟢 GREEN' : '🔴 레드';\n  }\n\n  const rowData = {\n    isError: false, timestamp: new Date().toISOString(), chatId, mediaGroupId,\n    상품명: productName, 사이즈: size, 영산공급가: supply, 매입물류비: pLog, 크림물류비: kLog,\n    계: totalCost, 목표마진: tMargin, 구매입찰가: buyQuote, 판매입찰가: sellQuote, 최근체결가: recentTrade,\n    목표입찰가: targetBid, 추천실행가: recommendedBid, 예상정산액: settlement, 최종마진: finalMargin,\n    판정: action, 태그: tag, 체결가능성: feasibility, 사유: reason, \n    실행유형: execType, 분석버전: SYS_VERSION\n  };\n\n  itemsToSave.push({ json: rowData });\n\n  if (['즉시 진행', '우선 검토', '일반 비딩', '관망'].includes(action) && tag !== '🔴 레드' && feasibility !== '정보 부족') {\n    summaryCandidates.push(rowData);\n  }\n}\n\nsummaryCandidates.sort((a, b) => {\n  const score = (x) => x.판정 === '즉시 진행' ? 4 : x.판정 === '우선 검토' ? 3 : x.판정 === '일반 비딩' ? 2 : 1;\n  if (score(b) !== score(a)) return score(b) - score(a);\n  return b.최종마진 - a.최종마진;\n});\n\nlet summaryText = `📊 *KREAM 자동매칭 [${SYS_VERSION}]: ${productName}*\\n`;\nsummaryText += `(계: ${won(totalCost)} | 마진목표: ${won(tMargin)})\\n\\n`;\n\nif (summaryCandidates.length === 0) {\n  summaryText += '⚠️ 타겟 마진을 충족하거나 실행 가능한 사이즈가 없습니다.\\n';\n} else {\n  const topRows = [];\n  const waitingRows = [];\n\n  for (const row of summaryCandidates) {\n    if (row.판정 === '관망') waitingRows.push(row);\n    else topRows.push(row);\n  }\n  const finalRows = [...topRows, ...waitingRows.slice(0, 2)].slice(0, 5);\n\n  for (const row of finalRows) {\n    summaryText += `🔹 *${row.사이즈}* (${row.태그} / ${row.판정})\\n`;\n    summaryText += `👉 실행방식: *${row.실행유형}*\\n`;\n    summaryText += `실행가: ${won(row.추천실행가)}원 | 예상마진: ${won(row.최종마진)}원\\n`;\n    summaryText += `(상태: ${row.체결가능성})\\n\\n`;\n  }\n}\n\nif (itemsToSave.length > 0) itemsToSave[0].json.telegramSummary = summaryText;\nreturn itemsToSave;"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "DB: 사진 정보 기록",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If: 3장 수집 완료": {
+      "main": [
+        [
+          {
+            "node": "Code: 데이터 단일화",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: 경로 가져오기": {
+      "main": [
+        [
+          {
+            "node": "HTTP: 이미지 다운로드",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: 이미지 다운로드": {
+      "main": [
+        [
+          {
+            "node": "Code: 이미지 병합",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: 이미지 병합": {
+      "main": [
+        [
+          {
+            "node": "If: 병합 정상 확인",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If: 병합 정상 확인": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Gemini (상품/시세 추출)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: 에러 알림",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Gemini (상품/시세 추출)": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets (단가표 로드)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: 에러 알림1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets (단가표 로드)": {
+      "main": [
+        [
+          {
+            "node": "Code: DB 매칭 및 V10 계산",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If: 정상 파싱 확인": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets (Append 결과)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code: 단일 요약 추출",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: 에러 알림",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: 단일 요약 추출": {
+      "main": [
+        [
+          {
+            "node": "Telegram: 브리핑 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "kream_album_buffer": {
+      "main": [
+        []
+      ]
+    },
+    "DB: 사진 정보 기록": {
+      "main": [
+        [
+          {
+            "node": "DB: 앨범 완성도 조회",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB: 앨범 완성도 조회": {
+      "main": [
+        [
+          {
+            "node": "If: 3장 수집 완료",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: 데이터 단일화": {
+      "main": [
+        [
+          {
+            "node": "Code: 파일ID 분할",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: 파일ID 분할": {
+      "main": [
+        [
+          {
+            "node": "HTTP: 경로 가져오기",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: DB 매칭 및 V10 계산": {
+      "main": [
+        [
+          {
+            "node": "If: 정상 파싱 확인",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "48a4a9d3-7b7b-4edd-a8bb-dc9abb7f4483",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7fd757978b19dcd8436e1af70a37fbfdfbda45bd7101a8b06439992d5dd6b86d"
+  },
+  "id": "FvgYEIrf1raaInSI",
+  "tags": []
+}

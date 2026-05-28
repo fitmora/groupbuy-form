@@ -119,7 +119,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// --- Price Parse & Merge (Smart Auto Discount & Precision Crawling) ---\n// 모드: Run Once for Each Item\n\n// --- 유틸리티 ---\nfunction num(v, d = null) {\n  const n = Number(String(v ?? '').replace(/[^\\d.-]/g, ''));\n  return Number.isFinite(n) ? n : d;\n}\nfunction num0(v) { return num(v, 0); }\n\nfunction stripTags(html) {\n  return String(html ?? '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\nfunction decode(s) {\n  return String(s ?? '')\n    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\");\n}\n\n// --- 1. 이름 정밀 파싱 (불필요한 태그 완벽 제외) ---\nfunction parseName(html) {\n  let m = html.match(/<div[^>]*class=[\"'][^\"']*headingArea[^\"']*[\"'][^>]*>\\s*<h1[^>]*>([\\s\\S]*?)<\\/h1>/i);\n  if (m) return decode(stripTags(m[1])).trim(); \n  \n  m = html.match(/<h1[^>]*>([\\s\\S]*?)<\\/h1>/i);\n  if (m) return decode(stripTags(m[1])).trim();\n\n  m = html.match(/<meta[^>]+property=[\"']og:title[\"'][^>]+content=[\"']([^\"']+)[\"']/i);\n  if (m) return decode(m[1]).trim();\n\n  return '';\n}\n\n// --- 2. 브랜드명 스마트 제거 ---\nfunction cleanBrandName(name = '') {\n  const brandPattern = '(?:온유어마크|On\\\\s?Your\\\\s?Mark|onyourmark(?:-running)?\\\\.com)(?:\\\\s*(?:공식)?\\\\s*온라인\\\\s*스토어|\\\\s*스토어|\\\\s*SHOP|\\\\s*몰)?';\n  let s = String(name);\n  const prefixRe = new RegExp(`^\\\\s*${brandPattern}\\\\s*[\\\\-|–—\\\\|·•]\\\\s*`, 'i');\n  s = s.replace(prefixRe, '');\n  const suffixRe = new RegExp(`\\\\s*[\\\\-|–—\\\\|·•]\\\\s*${brandPattern}\\\\s*$`, 'i');\n  s = s.replace(suffixRe, '');\n  const parenRe = new RegExp(`\\\\s*\\\\(${brandPattern}[^)]*\\\\)\\\\s*$`, 'i');\n  s = s.replace(parenRe, '');\n  return s.replace(/\\s+/g, ' ').trim();\n}\n\n// --- 3. 상품코드 전방위 수색 (함수명 extractSKU로 통일) ---\nfunction extractSKU(html, currentName) {\n  // 1순위: 이름 안에 괄호가 있는지 확인\n  const nameMatch = currentName.match(/\\(([^)]+)\\)$/);\n  if (nameMatch) return nameMatch[1].trim();\n\n  // 패턴 A: <th> 태그와 실제 코드 사이의 거리가 멀어 못 찾는 현상 해결 (수색 거리 300자 -> 2000자로 대폭 확장)\n  let m = html.match(/<th[^>]*>\\s*(?:코드|상품코드)\\s*<\\/th>[\\s\\S]{0,2000}?<li[^>]*title=[\"']([a-zA-Z0-9_-]{4,30})[\"']/i);\n  if (m) return m[1].toUpperCase();\n\n  // 패턴 B: span 태그로 감싸진 경우도 거리 2000자로 확장\n  m = html.match(/<th[^>]*>\\s*(?:코드|상품코드)\\s*<\\/th>[\\s\\S]{0,2000}?<span[^>]*>([a-zA-Z0-9_-]{4,30})<\\/span>/i);\n  if (m) return m[1].toUpperCase();\n\n  // 패턴 C: 기존 범용 테이블 (단, option이라는 단어가 섞여 있으면 무시)\n  const tablePatterns = [\n    /<th[^>]*>\\s*(?:상품코드|코드|모델명|품번|Product\\s*Code)\\s*<\\/th>\\s*<td[^>]*>\\s*(?:<p[^>]*>)?\\s*([a-zA-Z0-9_-]{4,30})\\s*(?:<\\/p>)?\\s*<\\/td>/i,\n    /item_code\\s*=\\s*[\"']([^\"']+)[\"']/i\n  ];\n  for (const pat of tablePatterns) {\n    const match = html.match(pat);\n    if (match && !match[1].toLowerCase().includes('option')) {\n      return stripTags(match[1]).trim().toUpperCase();\n    }\n  }\n\n  // 패턴 D: url meta (최후의 보루)\n  const urlMeta = html.match(/<meta[^>]+property=[\"']og:url[\"'][^>]+content=[\"']([^\"']+)[\"']/i);\n  if (urlMeta) {\n    const url = urlMeta[1];\n    const pathPart = url.split('/product/')[1] || '';\n    const codeMatch = pathPart.match(/([a-zA-Z]{2}\\d{4,})/);\n    if (codeMatch) return codeMatch[1].toUpperCase();\n  }\n  \n  return null;\n}\n\n// --- 가격 추출 로직 ---\nconst SALE_LABELS = [\n  /할인가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /판매가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /최종결제가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /구매가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n];\nconst ORIG_LABELS = [\n  /소비자가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /정가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /원가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /판매가\\s*\\(정상가\\)[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n];\nfunction findFirstPrice(text, patterns) {\n  for (const re of patterns) {\n    const m = text.match(re);\n    if (m) return num(m[1], null);\n  }\n  return null;\n}\nfunction parseListedPrice(html) {\n  const text = stripTags(html);\n  const sale = findFirstPrice(text, SALE_LABELS);\n  if (sale) return sale;\n  const m = text.match(/(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/);\n  return m ? num(m[1], null) : null;\n}\nfunction parseOriginalPrice(html) {\n  const text = stripTags(html);\n  return findFirstPrice(text, ORIG_LABELS);\n}\n\n// ── 실행 로직 ────────────────────────────────────────\nconst html = String($json.html ?? '');\nconst idx = (typeof $itemIndex === 'number') ? $itemIndex : 0;\nconst fromFlatten = (((($items('Flatten', 0, 0) || [])[idx] || {}).json) || {});\nconst prev = { ...fromFlatten, ...$json };\n\n// 1. 이름 정밀 확보\nlet nameRaw = parseName(html);\nlet name = cleanBrandName(nameRaw);\n\n// 2. SKU 정밀 수색 및 결합 (함수명 일치 완료)\nconst foundSKU = extractSKU(html, name);\n\n// 이름에 괄호가 포함되어 있지 않다면, 찾아낸 SKU를 뒤에 붙여줌\nif (foundSKU && !name.includes(`(${foundSKU})`)) {\n  name = name.replace(/\\([^)]+\\)$/, '').trim();\n  name = `${name} (${foundSKU})`;\n}\n\n// 3. 가격 파싱\nconst listedParsed   = num0(parseListedPrice(html));   \nconst originalParsed = num0(parseOriginalPrice(html)); \n\n// 4. [할인 규칙] 구글 시트 데이터 가져오기\nlet rules = [];\ntry {\n  rules = $('Google Sheets').all().map(r => r.json);\n} catch (e) {}\n\n// 5. 가격 결정 로직\n// ✅ 웹훅 데이터에서 소속(crew_name) 정보 가져오기\nlet userCrew = '일반';\ntry {\n  const whData = $('Webhook1').first().json.body || $('Webhook1').first().json;\n  if (whData.groups && whData.groups[0] && whData.groups[0].crew_name) {\n    userCrew = String(whData.groups[0].crew_name).trim();\n  }\n} catch (e) {}\n\nconst inputMode = prev.discount_mode; \nconst inputRate = Number(prev.discount_rate || 0);\nconst inputFixed = Number(prev.fixed_price || 0);\n\nlet original_price = originalParsed || (Number.isFinite(prev.original_price) ? num0(prev.original_price) : null) || null;\nconst listed_price = listedParsed || (Number.isFinite(prev.price) ? num0(prev.price) : null) || 0;\nconst display_price = original_price || listed_price; \n\nlet final_price = listed_price;\nlet final_mode = null;\nlet final_label = '0%';\nlet final_rate = 0;\nlet match_debug = null;\n\n// ✅ 추가: 영산 공급가(기본 할인가) 저장용 변수 세팅\nlet supply_rate = 0;\nlet supply_price = listed_price;\n\n// A. 수동 모드 우선\nif (inputMode === 'fixed' && inputFixed > 0) {\n  final_price = inputFixed;\n  final_mode = 'fixed';\n  final_label = '고정';\n} else if (inputMode === 'percent' && inputRate > 0) {\n  final_price = Math.round(display_price * (1 - inputRate / 100));\n  final_mode = 'percent';\n  final_label = `${inputRate}%`;\n  final_rate = inputRate;\n} \n// B. 자동 규칙 매칭 (✅ 고객 할인가 & 영산 공급가 동시 계산)\nelse {\n  const rawTarget = (name + ' ' + (foundSKU || '') + ' ' + (prev.product_url || ''));\n  const targetStr = rawTarget.replace(/\\s+/g, '').toUpperCase(); \n  \n  const matchedRule = rules.find(rule => {\n    const keyword = String(rule.keyword || '').replace(/\\s+/g, '').toUpperCase();\n    return keyword && targetStr.includes(keyword);\n  });\n\n  if (matchedRule) {\n    const crewRateKey = `discount_rate_${userCrew}`;\n    \n    // 💡 1. 고객용 최종 할인율 (효빠님이 수정하신 || 로직 유지!)\n    const ruleRate = Number(matchedRule[crewRateKey] || matchedRule.discount_rate || 0);\n\n    // 💡 2. 영산 공급용 기본 할인율 (크루 무시하고 무조건 discount_rate만 바라봄)\n    const baseRate = Number(matchedRule.discount_rate || 0);\n    supply_rate = baseRate * 100;\n    supply_price = baseRate > 0 ? Math.round(display_price * (1 - baseRate)) : display_price;\n\n    if (ruleRate > 0) {\n      final_mode = 'auto_rule';\n      final_rate = ruleRate * 100;\n      final_price = Math.round(display_price * (1 - ruleRate));\n      \n      const hasCrewRate = Number(matchedRule[crewRateKey]) > 0;\n      final_label = hasCrewRate ? `${final_rate}% (${userCrew})` : `${final_rate}% (자동)`;\n      match_debug = `Matched: ${matchedRule.keyword}, Crew: ${userCrew}`;\n    }\n  }\n}\n\nconst price_found = Number(final_price) > 0;\n\n// ✅ 계산된 공급가 데이터를 밖으로 내보냅니다.\nreturn {\n  json: {\n    ...prev,\n    name, \n    original_price: original_price ?? null,\n    listed_price,\n    display_price,\n    price: Number(final_price || 0),\n    discount_mode: final_mode,\n    discount_label: final_label,\n    discount_rate: Number(final_rate || 0),\n    supply_rate: supply_rate,     // 👉 영산 기준 공급 할인율 추가\n    supply_price: supply_price,   // 👉 영산 기준 공급 단가 추가\n    price_found,\n    match_debug \n  }\n};"
+        "jsCode": "// --- Price Parse & Merge (Smart Auto Discount & Precision Crawling) ---\n// 모드: Run Once for Each Item\n\n// --- 유틸리티 ---\nfunction num(v, d = null) {\n  const n = Number(String(v ?? '').replace(/[^\\d.-]/g, ''));\n  return Number.isFinite(n) ? n : d;\n}\nfunction num0(v) { return num(v, 0); }\n\nfunction stripTags(html) {\n  return String(html ?? '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\nfunction decode(s) {\n  return String(s ?? '')\n    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\");\n}\n\n// --- 1. 이름 정밀 파싱 (불필요한 태그 완벽 제외) ---\nfunction parseName(html) {\n  let m = html.match(/<div[^>]*class=[\"'][^\"']*headingArea[^\"']*[\"'][^>]*>\\s*<h1[^>]*>([\\s\\S]*?)<\\/h1>/i);\n  if (m) return decode(stripTags(m[1])).trim(); \n  \n  m = html.match(/<h1[^>]*>([\\s\\S]*?)<\\/h1>/i);\n  if (m) return decode(stripTags(m[1])).trim();\n\n  m = html.match(/<meta[^>]+property=[\"']og:title[\"'][^>]+content=[\"']([^\"']+)[\"']/i);\n  if (m) return decode(m[1]).trim();\n\n  return '';\n}\n\n// --- 2. 브랜드명 스마트 제거 ---\nfunction cleanBrandName(name = '') {\n  const brandPattern = '(?:온유어마크|On\\\\s?Your\\\\s?Mark|onyourmark(?:-running)?\\\\.com)(?:\\\\s*(?:공식)?\\\\s*온라인\\\\s*스토어|\\\\s*스토어|\\\\s*SHOP|\\\\s*몰)?';\n  let s = String(name);\n  const prefixRe = new RegExp(`^\\\\s*${brandPattern}\\\\s*[\\\\-|–—\\\\|·•]\\\\s*`, 'i');\n  s = s.replace(prefixRe, '');\n  const suffixRe = new RegExp(`\\\\s*[\\\\-|–—\\\\|·•]\\\\s*${brandPattern}\\\\s*$`, 'i');\n  s = s.replace(suffixRe, '');\n  const parenRe = new RegExp(`\\\\s*\\\\(${brandPattern}[^)]*\\\\)\\\\s*$`, 'i');\n  s = s.replace(parenRe, '');\n  return s.replace(/\\s+/g, ' ').trim();\n}\n\n// --- 3. 상품코드 전방위 수색 (함수명 extractSKU로 통일) ---\nfunction extractSKU(html, currentName) {\n  // 1순위: 이름 안에 괄호가 있는지 확인\n  const nameMatch = currentName.match(/\\(([^)]+)\\)$/);\n  if (nameMatch) return nameMatch[1].trim();\n\n  // 패턴 A: <th> 태그와 실제 코드 사이의 거리가 멀어 못 찾는 현상 해결 (수색 거리 300자 -> 2000자로 대폭 확장)\n  let m = html.match(/<th[^>]*>\\s*(?:코드|상품코드)\\s*<\\/th>[\\s\\S]{0,2000}?<li[^>]*title=[\"']([a-zA-Z0-9_-]{4,30})[\"']/i);\n  if (m) return m[1].toUpperCase();\n\n  // 패턴 B: span 태그로 감싸진 경우도 거리 2000자로 확장\n  m = html.match(/<th[^>]*>\\s*(?:코드|상품코드)\\s*<\\/th>[\\s\\S]{0,2000}?<span[^>]*>([a-zA-Z0-9_-]{4,30})<\\/span>/i);\n  if (m) return m[1].toUpperCase();\n\n  // 패턴 C: 기존 범용 테이블 (단, option이라는 단어가 섞여 있으면 무시)\n  const tablePatterns = [\n    /<th[^>]*>\\s*(?:상품코드|코드|모델명|품번|Product\\s*Code)\\s*<\\/th>\\s*<td[^>]*>\\s*(?:<p[^>]*>)?\\s*([a-zA-Z0-9_-]{4,30})\\s*(?:<\\/p>)?\\s*<\\/td>/i,\n    /item_code\\s*=\\s*[\"']([^\"']+)[\"']/i\n  ];\n  for (const pat of tablePatterns) {\n    const match = html.match(pat);\n    if (match && !match[1].toLowerCase().includes('option')) {\n      return stripTags(match[1]).trim().toUpperCase();\n    }\n  }\n\n  // 패턴 D: url meta (최후의 보루)\n  const urlMeta = html.match(/<meta[^>]+property=[\"']og:url[\"'][^>]+content=[\"']([^\"']+)[\"']/i);\n  if (urlMeta) {\n    const url = urlMeta[1];\n    const pathPart = url.split('/product/')[1] || '';\n    const codeMatch = pathPart.match(/([a-zA-Z]{2}\\d{4,})/);\n    if (codeMatch) return codeMatch[1].toUpperCase();\n  }\n  \n  return null;\n}\n\n// --- 가격 추출 로직 ---\nconst SALE_LABELS = [\n  /할인가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /판매가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /최종결제가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /구매가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n];\nconst ORIG_LABELS = [\n  /소비자가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /정가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /원가[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n  /판매가\\s*\\(정상가\\)[^0-9]{0,30}(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/i,\n];\nfunction findFirstPrice(text, patterns) {\n  for (const re of patterns) {\n    const m = text.match(re);\n    if (m) return num(m[1], null);\n  }\n  return null;\n}\nfunction parseListedPrice(html) {\n  const text = stripTags(html);\n  const sale = findFirstPrice(text, SALE_LABELS);\n  if (sale) return sale;\n  const m = text.match(/(\\d{1,3}(?:,\\d{3})*|\\d+)\\s*원/);\n  return m ? num(m[1], null) : null;\n}\nfunction parseOriginalPrice(html) {\n  const text = stripTags(html);\n  return findFirstPrice(text, ORIG_LABELS);\n}\n\n// ── 실행 로직 ────────────────────────────────────────\nconst html = String($json.html ?? '');\nconst idx = (typeof $itemIndex === 'number') ? $itemIndex : 0;\nconst fromFlatten = (((($items('Flatten', 0, 0) || [])[idx] || {}).json) || {});\nconst prev = { ...fromFlatten, ...$json };\n\n// 1. 이름 정밀 확보\nlet nameRaw = parseName(html);\nlet name = cleanBrandName(nameRaw);\n\n// 2. SKU 정밀 수색 및 결합 (함수명 일치 완료)\nconst foundSKU = extractSKU(html, name);\n\n// 이름에 괄호가 포함되어 있지 않다면, 찾아낸 SKU를 뒤에 붙여줌\nif (foundSKU && !name.includes(`(${foundSKU})`)) {\n  name = name.replace(/\\([^)]+\\)$/, '').trim();\n  name = `${name} (${foundSKU})`;\n}\n\n// 3. 가격 파싱\nconst listedParsed   = num0(parseListedPrice(html));   \nconst originalParsed = num0(parseOriginalPrice(html)); \n\n// 4. [할인 규칙] 구글 시트 데이터 가져오기\nlet rules = [];\ntry {\n  rules = $('Google Sheets').all().map(r => r.json);\n} catch (e) {}\n\n// 5. 가격 결정 로직\n// ✅ 웹훅 데이터에서 소속(crew_name) 정보 가져오기\nlet userCrew = '일반';\ntry {\n  const whData = $('Webhook1').first().json.body || $('Webhook1').first().json;\n  if (whData.groups && whData.groups[0] && whData.groups[0].crew_name) {\n    userCrew = String(whData.groups[0].crew_name).trim();\n  }\n} catch (e) {}\n\nconst inputMode = prev.discount_mode; \nconst inputRate = Number(prev.discount_rate || 0);\nconst inputFixed = Number(prev.fixed_price || 0);\n\nlet original_price = originalParsed || (Number.isFinite(prev.original_price) ? num0(prev.original_price) : null) || null;\nconst listed_price = listedParsed || (Number.isFinite(prev.price) ? num0(prev.price) : null) || 0;\nconst display_price = original_price || listed_price; \n\nlet final_price = listed_price;\nlet final_mode = null;\nlet final_label = '0%';\nlet final_rate = 0;\nlet match_debug = null;\n\n// ✅ 추가: 영산 공급가(기본 할인가) 저장용 변수 세팅\nlet supply_rate = 0;\nlet supply_price = listed_price;\n\n// A. 수동 모드 우선\nif (inputMode === 'fixed' && inputFixed > 0) {\n  final_price = inputFixed;\n  final_mode = 'fixed';\n  final_label = '고정';\n} else if (inputMode === 'percent' && inputRate > 0) {\n  final_price = Math.round(display_price * (1 - inputRate / 100));\n  final_mode = 'percent';\n  final_label = `${inputRate}%`;\n  final_rate = inputRate;\n} \n// B. 자동 규칙 매칭 (✅ 고객 할인가 & 영산 공급가 동시 계산)\nelse {\n  const rawTarget = (name + ' ' + (foundSKU || '') + ' ' + (prev.product_url || ''));\n  const targetStr = rawTarget.replace(/\\s+/g, '').toUpperCase(); \n  \n  const matchedRule = rules.find(rule => {\n    const keyword = String(rule.keyword || '').replace(/\\s+/g, '').toUpperCase();\n    return keyword && targetStr.includes(keyword);\n  });\n\n  if (matchedRule) {\n    const crewFixedKey = `fixed_price_${userCrew}`;\n    const crewRateKey  = `discount_rate_${userCrew}`;\n\n    // 영산 공급용 기본 할인율 (크루 무시, 무조건 discount_rate 기준)\n    const baseRate = Number(matchedRule.discount_rate || 0);\n    supply_rate = baseRate * 100;\n    supply_price = baseRate > 0 ? Math.round(display_price * (1 - baseRate)) : display_price;\n\n    match_debug = `Matched: ${matchedRule.keyword}, Crew: ${userCrew}`;\n\n    const crewFixedPrice   = num0(matchedRule[crewFixedKey]);\n    const commonFixedPrice = num0(matchedRule.fixed_price);\n\n    if (crewFixedPrice > 0) {\n      // 1순위: 크루별 고정가\n      final_price = crewFixedPrice;\n      final_mode  = 'fixed';\n      final_label = `고정가 (${userCrew})`;\n      final_rate  = 0;\n    } else if (commonFixedPrice > 0) {\n      // 2순위: 공통 고정가\n      final_price = commonFixedPrice;\n      final_mode  = 'fixed';\n      final_label = '고정가';\n      final_rate  = 0;\n    } else {\n      // 3/4순위: 크루별 할인율 → 공통 할인율\n      const rawRate  = matchedRule[crewRateKey] || matchedRule.discount_rate || 0;\n      const ruleRate = Number(rawRate || 0);\n\n      if (ruleRate > 0) {\n        final_price = Math.round(display_price * (1 - ruleRate));\n        final_mode  = 'auto_rule';\n        final_rate  = ruleRate * 100;\n        const hasCrewRate = Number(matchedRule[crewRateKey]) > 0;\n        final_label = hasCrewRate ? `${final_rate}% (${userCrew})` : `${final_rate}% (자동)`;\n      }\n    }\n  }\n}\n\nconst price_found = Number(final_price) > 0;\n\n// ✅ 계산된 공급가 데이터를 밖으로 내보냅니다.\nreturn {\n  json: {\n    ...prev,\n    name, \n    original_price: original_price ?? null,\n    listed_price,\n    display_price,\n    price: Number(final_price || 0),\n    discount_mode: final_mode,\n    discount_label: final_label,\n    discount_rate: Number(final_rate || 0),\n    supply_rate: supply_rate,     // 👉 영산 기준 공급 할인율 추가\n    supply_price: supply_price,   // 👉 영산 기준 공급 단가 추가\n    price_found,\n    match_debug \n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -323,6 +323,99 @@
       ],
       "id": "097427ff-67be-44dd-928d-d7f7baea9112",
       "name": "IF: Is Member?"
+    },
+    {
+      "id": "96ea220a-6ad8-4887-af93-2497fa5fe7d8",
+      "name": "Webhook: Mall Notice",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1248,
+        1520
+      ],
+      "webhookId": "ab12c578-f204-4b14-8286-082df56cf75c",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mall-notice",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "fbc05c3c-88db-4730-9aa5-35642765fff5",
+      "name": "GS: Get Notices",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -1056,
+        1520
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "g3fKC1QtYL8twF41",
+          "name": "Google Sheets account"
+        }
+      },
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY",
+          "mode": "list",
+          "cachedResultName": "groupbuy_orders",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bncNAOHsPNYx9epgb66JtaIPMAGCbf-vbswavXiSjQY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "notices",
+          "mode": "name"
+        },
+        "options": {
+          "returnFirstMatch": false
+        }
+      }
+    },
+    {
+      "id": "14291b99-7daa-45df-81b6-8ad24f34db64",
+      "name": "Code: Filter Notice",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        1520
+      ],
+      "parameters": {
+        "jsCode": "// Webhook body에서 crew 읽기 (GS 결과에 덮이지 않도록 원본 참조)\nconst webhookData = $('Webhook: Mall Notice').first().json;\nconst body = webhookData.body || webhookData;\nconst crew = String(body.crew || '').trim();\n\n// notices 탭 전체 행\nconst rows = $('GS: Get Notices').all().map(r => r.json);\n\nconst isActive = (v) => {\n  const s = String(v ?? '').trim().toUpperCase();\n  return s === 'TRUE' || s === '1' || s === 'Y' || s === 'YES';\n};\n\nconst matched = rows.find(r =>\n  String(r.crew || '').trim() === crew &&\n  isActive(r.active) &&\n  String(r.notice_html || '').trim()\n);\n\nif (matched) {\n  return [{\n    json: {\n      ok: true,\n      crew,\n      title: String(matched.title || ''),\n      notice_html: String(matched.notice_html || ''),\n      updated_at: String(matched.updated_at || '')\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    ok: false,\n    crew,\n    message: '공지사항이 없습니다.',\n    notice_html: ''\n  }\n}];"
+      }
+    },
+    {
+      "id": "c06b4360-10c7-4c2c-a940-08b1da8ddc7e",
+      "name": "Respond: Notice",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        1520
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              }
+            ]
+          }
+        }
+      }
     }
   ],
   "pinData": {
@@ -538,6 +631,39 @@
         [
           {
             "node": "Respond: Denied",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: Mall Notice": {
+      "main": [
+        [
+          {
+            "node": "GS: Get Notices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GS: Get Notices": {
+      "main": [
+        [
+          {
+            "node": "Code: Filter Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Filter Notice": {
+      "main": [
+        [
+          {
+            "node": "Respond: Notice",
             "type": "main",
             "index": 0
           }

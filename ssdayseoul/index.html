@@ -220,12 +220,16 @@
     </div>
   </div>
   <div style="margin-top:12px">
-    <label for="buyer_addr">주소 *</label>
+    <label for="buyer_addr">기본주소 *</label>
     <div class="addr-row">
       <input id="buyer_addr" class="control addr-input" type="text" placeholder="도로명 주소" />
       <button id="addr_search" class="btn-ghost addr-btn" type="button">주소 검색</button>
     </div>
-    <div class="hint">검색으로 기본 주소를 채운 후 상세주소는 이어서 입력합니다.</div>
+    <div style="margin-top:8px">
+      <label for="buyer_addr_detail">상세주소 *</label>
+      <input id="buyer_addr_detail" class="control" type="text" placeholder="예: 101동 1203호 / 3층 사무실" />
+    </div>
+    <div class="hint">주소 검색 후 상세주소(동/호수, 층, 건물명 등)를 입력해 주세요.</div>
   </div>
 
   <div style="margin-top: 24px; padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
@@ -599,9 +603,9 @@ $('#addr_search').addEventListener('click', () => {
     oncomplete: function(data) {
       const addr = data.roadAddress || data.address;
       const zone = data.zonecode ? `(${data.zonecode}) ` : '';
-      const current = $('#buyer_addr').value.trim();
-      $('#buyer_addr').value = zone + addr + (current ? ' ' + current : '');
-      $('#buyer_addr').focus();
+      $('#buyer_addr').value = zone + addr;
+      const detailInput = $('#buyer_addr_detail');
+      if (detailInput) { detailInput.value = ''; detailInput.focus(); }
     }
   }).open();
 });
@@ -835,7 +839,9 @@ function buildPayload(){
     crew_name: currentCrew,
     phone:   formatPhoneKR($('#buyer_phone').value),
     email:   $('#buyer_email').value.trim(),
-    address: $('#buyer_addr').value.trim(),
+    address: ($('#buyer_addr').value.trim() + ' ' + $('#buyer_addr_detail').value.trim()).trim(),
+    address_base: $('#buyer_addr').value.trim(),
+    address_detail: $('#buyer_addr_detail').value.trim(),
     marketing_consent: $('#marketing_consent') ? $('#marketing_consent').checked : false
   };
   const items = $$('#items .item-box').map(box => {
@@ -867,7 +873,8 @@ function buildPayload(){
 }
 function validateRequired(payload){
   const g = payload?.groups?.[0];
-  if (!g || !g.name || !g.email || !g.address) return { ok:false, msg:'주문자 정보를 모두 입력해 주세요.' };
+  if (!g || !g.name || !g.email || !g.address_base) return { ok:false, msg:'주문자 정보를 모두 입력해 주세요.' };
+  if (!g.address_detail) return { ok:false, msg:'상세주소를 입력해 주세요.' };
   if (!g.phone || g.phone.length < 10) return { ok:false, msg:'연락처를 올바르게 입력해 주세요.' };
   if (!g.items.length) return { ok:false, msg:'상품을 추가해 주세요.' };
   for(let i=0; i<g.items.length; i++){

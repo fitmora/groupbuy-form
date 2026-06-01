@@ -492,7 +492,14 @@ document.addEventListener('keydown', (e)=>{ if(!e.altKey)return; if(e.code==='Ke
 const VALIDATE_URL = "https://primary-production-97a64.up.railway.app/webhook/groupbuy/validate";
 const SUBMIT_URL   = "https://primary-production-97a64.up.railway.app/webhook/internal-order-feed";
 const NOTICE_URL   = "https://primary-production-97a64.up.railway.app/webhook/mall-notice";
+const MANUAL_PRODUCTS_URL = "https://primary-production-97a64.up.railway.app/webhook/manual-products";
 const ADMIN_EMAIL  = "elvina79@gmail.com";
+
+/* ===== 사전 판매(manual) 상품 상태 ===== */
+let MANUAL_PRODUCTS = [];
+let manualProductsLoaded = false;
+let manualProductsError = false;
+let itemSeq = 0;
 
 /* [수정] 할인 옵션: '자동 적용' 하나만 남김 */
 const DISCOUNT_OPTIONS = [
@@ -642,6 +649,80 @@ function initRecommendation() {
   });
 }
 
+/* ===== 사전 판매 상품 로딩 ===== */
+async function loadManualProducts(){
+  try{
+    const res = await fetch(MANUAL_PRODUCTS_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ crew: currentCrew })
+    });
+    if(!res.ok) throw new Error('bad status');
+    const data = await res.json();
+    if(!data || !data.ok || !Array.isArray(data.products)) throw new Error('bad data');
+    MANUAL_PRODUCTS = data.products;
+    manualProductsLoaded = true;
+    manualProductsError = false;
+    applyManualProductsToAllRows();
+  }catch(err){
+    manualProductsError = true;
+    manualProductsLoaded = false;
+    disableManualOptionAllRows();
+    console.warn('사전 판매 상품 목록을 불러오지 못했습니다.', err);
+  }
+}
+function manualOptionsHTML(){
+  let html = '<option value="">상품을 선택하세요</option>';
+  MANUAL_PRODUCTS.forEach(p => {
+    const kw = esc(p.keyword || '');
+    const nm = esc(p.product_name || p.keyword || '');
+    const priceTxt = (p.original_price && Number(p.original_price) > 0) ? ` (${krw(p.original_price)})` : '';
+    html += `<option value="${kw}">${nm}${priceTxt}</option>`;
+  });
+  return html;
+}
+function applyManualProductsToAllRows(){
+  $$('#items .item-box').forEach(box => {
+    const sel = box.querySelector('select[name="manual_keyword"]');
+    if(sel){
+      const cur = sel.value;
+      sel.innerHTML = manualOptionsHTML();
+      if(cur) sel.value = cur;
+    }
+    const manualRadio = box.querySelector('input[name^="product_mode_"][value="manual"]');
+    if(manualRadio) manualRadio.disabled = false;
+    const note = box.querySelector('[data-manual-note]');
+    if(note) note.textContent = '';
+  });
+}
+function disableManualOptionAllRows(){
+  $$('#items .item-box').forEach(box => {
+    const manualRadio = box.querySelector('input[name^="product_mode_"][value="manual"]');
+    if(manualRadio) manualRadio.disabled = true;
+    const note = box.querySelector('[data-manual-note]');
+    if(note) note.textContent = '상품 목록을 불러오지 못했습니다.';
+  });
+}
+/* 편집 복귀 등으로 일괄 enable 된 뒤 사전 판매 상품 가용 상태를 다시 반영 */
+function refreshManualProductAvailability(){
+  // 로딩 실패 시 사전 판매 라디오/안내는 계속 비활성화 유지
+  if(manualProductsError) disableManualOptionAllRows();
+  // 각 행의 현재 모드(url/manual)에 맞춰 입력 표시·활성 상태 재적용
+  $$('#items .item-box').forEach(box => {
+    const checked = box.querySelector('input[name^="product_mode_"]:checked');
+    const m = checked ? checked.value : 'url';
+    const urlInput  = box.querySelector('input[name="product_url"]');
+    const manualSel = box.querySelector('select[name="manual_keyword"]');
+    if(m === 'manual'){
+      if(urlInput){ urlInput.style.display = 'none'; urlInput.disabled = true; }
+      if(manualSel){ manualSel.style.display = '';    manualSel.disabled = false; }
+    }else{
+      if(urlInput){ urlInput.style.display = '';     urlInput.disabled = false; }
+      if(manualSel){ manualSel.style.display = 'none'; manualSel.disabled = true; }
+    }
+  });
+}
+
 /* ===== 아이템 행 생성 ===== */
 function discountSelectHTML(){
   const opts = DISCOUNT_OPTIONS.map(o => `<option value="${o.key}">${o.label}</option>`).join('');
@@ -652,11 +733,24 @@ function createItemRow(idx){
   const el = document.createElement('div');
   el.className = 'item-box';
   el.dataset.idx = idx;
+  const modeName = `product_mode_${++itemSeq}`;
   el.innerHTML = `
+    <div class="mode-toggle" style="display:flex; gap:18px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+      <label style="display:inline-flex; align-items:center; gap:6px; margin:0; font-weight:600; cursor:pointer;">
+        <input type="radio" name="${modeName}" value="url" checked> 상품 URL 입력
+      </label>
+      <label style="display:inline-flex; align-items:center; gap:6px; margin:0; font-weight:600; cursor:pointer;">
+        <input type="radio" name="${modeName}" value="manual"> 사전 판매 상품
+      </label>
+      <span data-manual-note class="hint" style="color:#dc2626;"></span>
+    </div>
     <div class="item-grid">
       <div class="col-url">
-        <label>상품 URL *</label>
-        <input name="product_url" class="control" type="url" placeholder="https://··· 실제 상품 URL" required />
+        <label data-label-url>상품 URL *</label>
+        <input name="product_url" class="control product-url-input" type="url" placeholder="https://··· 실제 상품 URL" />
+        <select name="manual_keyword" class="control manual-select" style="display:none">
+          <option value="">상품을 선택하세요</option>
+        </select>
       </div>
       <div class="col-qty">
         <label>수량 *</label>
@@ -677,9 +771,40 @@ function createItemRow(idx){
     </div>
     <div class="flex" style="margin-top:8px">
       <button type="button" class="btn-ghost remove">– 제거</button>
-      <span class="muted">필수: URL / 수량 / 사이즈</span>
+      <span class="muted">필수: 상품 / 수량 / 사이즈</span>
     </div>
   `;
+
+  const urlInput  = el.querySelector('input[name="product_url"]');
+  const manualSel = el.querySelector('select[name="manual_keyword"]');
+  const urlLabel  = el.querySelector('[data-label-url]');
+  const radios    = el.querySelectorAll(`input[name="${modeName}"]`);
+
+  function applyMode(m){
+    if(m === 'manual'){
+      urlInput.style.display = 'none'; urlInput.disabled = true;
+      manualSel.style.display = '';    manualSel.disabled = false;
+      if(urlLabel) urlLabel.textContent = '사전 판매 상품 *';
+    }else{
+      urlInput.style.display = '';     urlInput.disabled = false;
+      manualSel.style.display = 'none'; manualSel.disabled = true;
+      if(urlLabel) urlLabel.textContent = '상품 URL *';
+    }
+  }
+  radios.forEach(r => r.addEventListener('change', () => { if(r.checked) applyMode(r.value); }));
+
+  // 이미 로드된 사전 판매 상품 목록 반영 / 로드 실패 시 옵션 비활성화
+  if(manualProductsLoaded){
+    manualSel.innerHTML = manualOptionsHTML();
+  }
+  if(manualProductsError){
+    const manualRadio = el.querySelector(`input[name="${modeName}"][value="manual"]`);
+    if(manualRadio) manualRadio.disabled = true;
+    const note = el.querySelector('[data-manual-note]');
+    if(note) note.textContent = '상품 목록을 불러오지 못했습니다.';
+  }
+  applyMode('url');
+
   el.querySelector('.remove').addEventListener('click', () => {
     if ($$('#items .item-box').length <= 1) return;
     el.remove(); refreshControls();
@@ -717,8 +842,18 @@ function buildPayload(){
     const $q = s => box.querySelector(s);
     const choiceKey = ($q('select[name="discount_choice"]').value || '').trim();
     const choice = DISCOUNT_OPTIONS.find(o => o.key === choiceKey) || {mode:null, value:null};
+    const modeEl = box.querySelector('input[name^="product_mode_"]:checked');
+    const product_mode = modeEl ? modeEl.value : 'url';
+    const product_url = product_mode === 'url'
+      ? ($q('input[name="product_url"]').value || '').trim()
+      : '';
+    const manual_keyword = product_mode === 'manual'
+      ? ($q('select[name="manual_keyword"]').value || '').trim()
+      : '';
     return {
-      product_url: ($q('input[name="product_url"]').value || '').trim(),
+      product_mode,
+      product_url,
+      manual_keyword,
       qty: Number($q('input[name="qty"]').value || 1),
       size: ($q('input[name="size"]').value || '').trim(),
       notes: ($q('input[name="notes"]').value || '').trim(),
@@ -737,7 +872,11 @@ function validateRequired(payload){
   if (!g.items.length) return { ok:false, msg:'상품을 추가해 주세요.' };
   for(let i=0; i<g.items.length; i++){
     const it = g.items[i];
-    if(!/^https?:\/\//i.test(it.product_url)) return { ok:false, msg:`#${i+1} 상품 URL을 확인해 주세요.` };
+    if(it.product_mode === 'manual'){
+      if(!it.manual_keyword) return { ok:false, msg:`#${i+1} 사전 판매 상품을 선택해 주세요.` };
+    }else{
+      if(!/^https?:\/\//i.test(it.product_url)) return { ok:false, msg:`#${i+1} 상품 URL을 확인해 주세요.` };
+    }
     if(!it.discount_mode) return { ok:false, msg:`#${i+1} 할인 항목을 선택해 주세요.` };
   }
   return { ok:true };
@@ -796,6 +935,7 @@ function enterEdit(){
   $('#check_fieldset').style.opacity = 1;
   $$('input, select, button').forEach(el => el.disabled = false);
   refreshControls();
+  refreshManualProductAvailability();
   reviewHeader.style.display = 'none';
   result.innerHTML = '';
   window.scrollTo({ top:0, behavior:'smooth' });
@@ -826,13 +966,16 @@ function renderOrderCard(resp){
     else disc = '자동 적용';
 
     const price = Number(it.display_price ?? it.original_price ?? it.listed_price ?? 0);
+    const priceTxt = price > 0 ? krw(price) : '—';
+    const hasUrl = it.product_url && /^https?:\/\//i.test(it.product_url);
+    const linkHtml = hasUrl ? `<a href="${esc(it.product_url)}" target="_blank" class="url">상품 페이지 열기</a> · ` : '';
     return `
       <tr>
         <td>
           <div style="font-weight:700">${name}</div>
-          <div class="subtle"><a href="${esc(it.product_url)}" target="_blank" class="url">상품 페이지 열기</a> · 사이즈: ${esc(it.size)}${it.notes?` · 메모: ${esc(it.notes)}`:''}</div>
+          <div class="subtle">${linkHtml}사이즈: ${esc(it.size)}${it.notes?` · 메모: ${esc(it.notes)}`:''}</div>
         </td>
-        <td data-label="가격">${krw(price)}</td>
+        <td data-label="가격">${priceTxt}</td>
         <td data-label="할인율">${disc}</td>
         <td data-label="수량">${it.qty}</td>
         <td data-label="소계" style="text-align:right; font-weight:bold">${krw(it.total)}</td>
@@ -958,6 +1101,7 @@ btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else d
   initItems();
   initRecommendation();
   loadNotice();
+  loadManualProducts();
 
   const saved = sessionStorage.getItem(SESSION_KEY);
   if (!saved) return;

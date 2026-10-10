@@ -380,6 +380,61 @@ const SESSION_KEY = 'weecl_session';
 const SESSION_TTL = 3600000; // 1시간
 const currentCrew = '썬데이서울';
 
+
+/* Inventory auth is page-memory only; never stored or returned by the server. */
+let inventoryAuth=null,inventoryOutcomeUnknown=false,inventoryReauthPending=false;
+const inventoryRows=new WeakMap();
+function inventoryRequireReauth(){
+ inventoryAuth=null;inventoryReauthPending=true;lastValidated=null;
+ if(mode==='review')enterEdit();
+ const gate=document.getElementById('auth_gate');
+ if(gate){gate.querySelectorAll('input,select,button').forEach(el=>el.disabled=false);gate.style.display='flex';}
+}
+function inventoryAuthBody(){
+ if(!inventoryAuth||inventoryAuth.crew!==normalizeCrew(currentCrew)||Date.now()-inventoryAuth.time>=SESSION_TTL){
+  inventoryRequireReauth();
+  throw Object.assign(new Error('주문을 위해 다시 인증해 주세요.'),{code:'MEMBER_REAUTH_REQUIRED'});
+ }
+ return {name:inventoryAuth.name,code:inventoryAuth.code,crew:inventoryAuth.crew};
+}
+function inventoryRequestBody(body){return {...body,_member_auth:inventoryAuthBody()};}
+function inventoryRowFields(box){
+ const state=inventoryRows.get(box);
+ return {row_id:state?.id||'',row_revision:state?.revision||0,variant_id:box.dataset.inventoryVariant||'',color:box.dataset.inventoryColor||''};
+}
+function inventoryMessage(data){
+ const messages={SOLD_OUT:'선택한 옵션이 품절되었습니다. 주문은 접수되지 않았습니다.',STOCK_UNKNOWN:'재고를 확인하지 못해 주문이 접수되지 않았습니다.',VARIANT_IDENTITY_MISMATCH:'상품 옵션이 변경되었습니다. 다시 선택해 주세요.',REQUOTE_REQUIRED:'가격이나 주문 내용이 변경되었습니다. 다시 검토해 주세요.',MEMBER_DENIED:'회원 정보를 다시 인증해 주세요.',MEMBER_REAUTH_REQUIRED:'회원 정보를 다시 인증해 주세요.',CREW_MISMATCH:'소속 정보를 다시 인증해 주세요.'};
+ return messages[data?.code]||'상품과 주문 정보를 확인하지 못해 접수되지 않았습니다. 다시 검토해 주세요.';
+}
+function inventoryInstallRow(box){
+ const url=box.querySelector('input[name="product_url"]'),size=box.querySelector('input[name="size"]'),select=box.querySelector('select[name="inventory_variant"]'),hint=box.querySelector('[data-inventory-note]');
+ const state={id:'item_'+itemSeq,revision:0,variants:[]};inventoryRows.set(box,state);
+ function reset(){state.revision++;state.variants=[];box.dataset.inventoryVariant='';box.dataset.inventoryColor='';size.value='';select.replaceChildren();const option=document.createElement('option');option.value='';option.textContent='구매 가능한 옵션을 확인해 주세요';select.appendChild(option);select.disabled=true;lastValidated=null;}
+ function mode(){
+  reset();const manual=box.querySelector('input[name^="product_mode_"]:checked')?.value==='manual';size.style.display=manual?'':'none';size.readOnly=!manual;select.style.display=manual?'none':'';
+  hint.textContent=manual?'사전 판매 상품은 공급처 재고 조회 대상이 아닙니다.':'구매 가능 표시는 재고 확보를 보장하지 않습니다. 품절·취소될 수 있습니다.';
+ }
+ url.addEventListener('input',reset);
+ url.addEventListener('change',async()=>{
+  if(!url.value.trim())return;reset();const revision=state.revision,requested=url.value.trim();hint.textContent='구매 가능한 옵션을 확인 중입니다…';
+  try{
+   const response=await fetch(AUTH_URL.replace('/member-auth','/groupbuy/options'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(inventoryRequestBody({product_url:requested}))});
+   const data=await response.json();if(!box.isConnected||state.revision!==revision||url.value.trim()!==requested)return;
+   if(!response.ok||data?.ok!==true||!Array.isArray(data.product?.variants))throw new Error(inventoryMessage(data));
+   state.variants=data.product.variants.filter(v=>v.available===true&&!v.hidden);
+   for(const v of state.variants){const option=document.createElement('option');option.value=v.variant_id;option.textContent=v.size+(v.color?' · '+v.color:'');select.appendChild(option);}
+   select.disabled=state.variants.length===0;hint.textContent=select.disabled?'구매 가능한 옵션이 없습니다.':'구매 가능 표시는 수량 확정이나 재고 확보를 보장하지 않습니다. 품절·취소될 수 있습니다.';
+  }catch(e){if(state.revision===revision)hint.textContent=e.message;}
+ });
+ select.addEventListener('change',()=>{
+  const variant=state.variants.find(v=>v.variant_id===select.value);box.dataset.inventoryVariant=variant?.variant_id||'';box.dataset.inventoryColor=variant?.color||'';size.value=variant?.size||'';lastValidated=null;
+ });
+ box.querySelectorAll('input[name^="product_mode_"]').forEach(r=>r.addEventListener('change',mode));
+ box.querySelector('input[name="qty"]').addEventListener('input',()=>{lastValidated=null;});
+ box.querySelector('select[name="manual_keyword"]').addEventListener('change',()=>{lastValidated=null;});
+ mode();
+}
+
 function normalizeCrew(value) {
   return String(value ?? '').trim();
 }
@@ -398,7 +453,8 @@ function handleAuthSuccess(name, crew, time) {
   document.getElementById('auth_gate').style.display = 'none';
   document.getElementById('main_app').style.display = 'block';
   const buyerInput = document.getElementById('buyer_name');
-  if (buyerInput) buyerInput.value = name || '';
+  if (buyerInput && !inventoryReauthPending) buyerInput.value = name || '';
+  inventoryReauthPending=false;
 
   const sessionTime = Number.isFinite(Number(time)) && Number(time) > 0 ? Number(time) : Date.now();
 
@@ -415,6 +471,7 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
   const msgArea = document.getElementById('auth_msg');
   const btnEl = document.getElementById('auth_btn');
 
+  inventoryAuth=null;
   const name = nameInput.value.trim();
   const code = codeInput.value.trim();
 
@@ -439,6 +496,7 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
     const result = await response.json();
 
     if (result.allowed || result.ok) {
+      inventoryAuth={name,code,crew:normalizeCrew(currentCrew),time:Date.now()};
       // ✅ 서버가 주는 crew 값에 매몰되지 않습니다.
       // 인증(ok)만 통과했다면, 이 프론트엔드의 주인인 currentCrew('썬데이서울')를 강제로 사용합니다.
       const fixedCrew = normalizeCrew(currentCrew);
@@ -767,6 +825,8 @@ function createItemRow(idx){
       <div class="col-size">
         <label>사이즈 *</label>
         <input name="size" class="control" type="text" placeholder="예: 285 / 100" oninput="this.value = this.value.toUpperCase();" />
+        <select name="inventory_variant" class="control" disabled><option value="">구매 가능한 옵션을 확인해 주세요</option></select>
+        <span data-inventory-note class="hint"></span>
       </div>
       <div class="col-discount">
         <label>할인율 *</label>
@@ -817,6 +877,7 @@ function createItemRow(idx){
     if ($$('#items .item-box').length <= 1) return;
     el.remove(); refreshControls();
   });
+  inventoryInstallRow(el);
   return el;
 }
 function refreshControls(){
@@ -861,6 +922,7 @@ function buildPayload(){
       ? ($q('select[name="manual_keyword"]').value || '').trim()
       : '';
     return {
+      ...inventoryRowFields(box),
       product_mode,
       product_url,
       manual_keyword,
@@ -888,6 +950,7 @@ function validateRequired(payload){
     }else{
       if(!/^https?:\/\//i.test(it.product_url)) return { ok:false, msg:`#${i+1} 상품 URL을 확인해 주세요.` };
     }
+    if(it.product_mode==='url'&&(!it.variant_id||!it.size))return {ok:false,msg:'구매 가능한 상품 옵션을 선택해 주세요.'};
     if(!it.discount_mode) return { ok:false, msg:`#${i+1} 할인 항목을 선택해 주세요.` };
   }
   return { ok:true };
@@ -918,7 +981,7 @@ async function doValidate(){
     const res = await fetch(VALIDATE_URL, {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(inventoryRequestBody(payload))
     });
     const data = await res.json().catch(()=>null);
     if(!data){ throw new Error('No JSON response'); }
@@ -943,7 +1006,7 @@ function enterReview(){
   $('#buyer_fieldset').style.opacity = .6;
   $('#items_fieldset').style.opacity = .6;
   $('#check_fieldset').style.opacity = .6; /* [추가] 상품확인 섹션도 흐리게 */
-  $$('input, select, button:not(#btn):not(#modalBtn):not(#confirmBtn):not(#btnHowTo):not(#infoCloseBtn)').forEach(el => el.disabled = true);
+  $$('#main_app input, #main_app select, #main_app button:not(#btn):not(#modalBtn):not(#confirmBtn):not(#btnHowTo):not(#infoCloseBtn)').forEach(el => el.disabled = true);
   showReviewHeader('주문 검토');
 }
 function enterEdit(){
@@ -952,7 +1015,7 @@ function enterEdit(){
   $('#buyer_fieldset').style.opacity = 1;
   $('#items_fieldset').style.opacity = 1;
   $('#check_fieldset').style.opacity = 1;
-  $$('input, select, button').forEach(el => el.disabled = false);
+  $$('#main_app input, #main_app select, #main_app button').forEach(el => el.disabled = false);
   refreshControls();
   refreshManualProductAvailability();
   reviewHeader.style.display = 'none';
@@ -992,7 +1055,7 @@ function renderOrderCard(resp){
       <tr>
         <td>
           <div style="font-weight:700">${name}</div>
-          <div class="subtle">${linkHtml}사이즈: ${esc(it.size)}${it.notes?` · 메모: ${esc(it.notes)}`:''}</div>
+          <div class="subtle">${linkHtml}사이즈: ${esc(it.size)}${it.color?` · 색상: ${esc(it.color)}`:''}${it.variant_id?` · 옵션: ${esc(it.variant_id)}`:''}${it.notes?` · 메모: ${esc(it.notes)}`:''}</div>
         </td>
         <td data-label="가격">${priceTxt}</td>
         <td data-label="할인율">${disc}</td>
@@ -1033,6 +1096,8 @@ function renderOrderCard(resp){
 
 async function submitFinal(){
   if (submitting) return;
+  if(inventoryOutcomeUnknown){openModalHTML('접수 결과가 확인되지 않았습니다. 자동으로 다시 전송하지 말고 관리자에게 확인해 주세요.',false);return;}
+  if(!lastValidated){alert('주문을 다시 검토해 주세요.');return;}
 
   const payload = buildPayload();
 
@@ -1084,11 +1149,11 @@ async function submitFinal(){
     const res = await fetch(SUBMIT_URL, {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(inventoryRequestBody(body)),
     });
 
     const data = await res.json().catch(()=>null);
-    const ok = (data && (data.ok === true || data.status === 'ok')) || res.ok;
+    const ok = res.ok && data?.ok===true && typeof data.order_id==='string' && !!data.order_id;
 
     if (ok){
       showReviewHeader('주문 완료');
@@ -1101,13 +1166,16 @@ async function submitFinal(){
 
       openModalHTML(html, true);
     }else{
-      openModalHTML('주문 접수 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.', false);
+      inventoryOutcomeUnknown=data?.preflight_failed!==true;
+      openModalHTML(inventoryOutcomeUnknown?'접수 결과가 확인되지 않았습니다. 자동으로 다시 전송하지 말고 관리자에게 확인해 주세요.':inventoryMessage(data),false);
       $('#confirmBtn').disabled = false;
       btn.disabled = false;
     }
   }catch(e){
-    openModalHTML('네트워크 오류가 발생했습니다. 다시 시도해 주세요.', false);
-    $('#confirmBtn').disabled = false;
+    inventoryOutcomeUnknown=e.code!=='MEMBER_REAUTH_REQUIRED';
+    openModalHTML(inventoryOutcomeUnknown?'접수 결과가 확인되지 않았습니다. 자동으로 다시 전송하지 말고 관리자에게 확인해 주세요.':'주문을 위해 다시 인증해 주세요.',false);
+    const confirmBtn = $('#confirmBtn');
+    if (confirmBtn) confirmBtn.disabled = false;
     btn.disabled = false;
   }finally{
     submitting = false;

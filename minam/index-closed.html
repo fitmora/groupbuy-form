@@ -817,7 +817,7 @@ function renderOrderCard(resp){
       <tr>
         <td>
           <div style="font-weight:700">${name}</div>
-          <div class="subtle"><a href="${esc(it.product_url)}" target="_blank" class="url">상품 페이지 열기</a> · 사이즈: ${esc(it.size)}${it.notes?` · 메모: ${esc(it.notes)}`:''}</div>
+          <div class="subtle"><a href="${esc(it.product_url)}" target="_blank" class="url">상품 페이지 열기</a> · 사이즈: ${esc(it.size)}${it.color?` · 색상: ${esc(it.color)}`:''}${it.variant_id?` · 옵션: ${esc(it.variant_id)}`:''}${it.notes?` · 메모: ${esc(it.notes)}`:''}</div>
         </td>
         <td data-label="가격">${krw(price)}</td>
         <td data-label="할인율">${disc}</td>

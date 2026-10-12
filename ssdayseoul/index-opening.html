@@ -176,6 +176,12 @@
     }
     .table td:first-child::before { display: none; }
   }
+  .viewer-price{position:relative;isolation:isolate;overflow:hidden}
+  .viewer-pattern{position:absolute;inset:0;overflow:hidden;pointer-events:none;user-select:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:center;gap:3px;opacity:.12;color:#334155;font-size:11px;font-weight:300;line-height:1.4;z-index:-1}
+  .viewer-pattern span{display:block;white-space:nowrap;transform:rotate(-18deg);max-width:176px;overflow:hidden}
+  .row2 .viewer-price{min-width:142px;min-height:32px;padding:5px 8px;box-sizing:border-box;text-align:right}
+  .viewer-member{display:block;max-width:100%;overflow-wrap:anywhere;color:#64748b;font-size:11px;font-weight:400;margin:8px 0}
+  @media (forced-colors:active){.viewer-pattern{display:none}}
 </style>
 </head>
 <body>
@@ -439,7 +445,53 @@ function normalizeCrew(value) {
   return String(value ?? '').trim();
 }
 
-function handleAuthSuccess(name, crew, time) {
+// Display only: source is member-auth; no recipient, quote or order payload fallback.
+let viewerWatermark=null,viewerWatermarkTimer=null;
+function viewerProfile(value){
+ if(!value||typeof value.name!=='string'||!value.name.trim()||[...value.name].length>80||/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(value.name)||typeof value.phone_last4!=='string'||!/^\d{4}$/.test(value.phone_last4))return null;
+ return {name:value.name.trim(),phone_last4:value.phone_last4};
+}
+function clearViewerWatermark(){
+ viewerWatermark=null;clearTimeout(viewerWatermarkTimer);viewerWatermarkTimer=null;
+ document.querySelectorAll('.viewer-pattern,.viewer-member').forEach(node=>node.remove());
+ // Preserve the existing session and all unresolved-order recovery data.
+ try{const saved=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');if(saved&&Object.hasOwn(saved,'viewer_watermark')){delete saved.viewer_watermark;sessionStorage.setItem(SESSION_KEY,JSON.stringify(saved));}}catch{}
+}
+function currentViewerWatermark(){
+ let saved;try{saved=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');}catch{}
+ const now=Date.now(),v=viewerWatermark;
+ if(!v||!saved||saved.name!==v.session_name||normalizeCrew(saved.crew)!==v.crew||v.crew!==normalizeCrew(currentCrew)||saved.time!==v.time||!Number.isFinite(v.time)||v.time>now||now-v.time>=SESSION_TTL){clearViewerWatermark();return null;}
+ return v.profile;
+}
+function acceptViewerWatermark(evidence,time,restoring){
+ if(!restoring&&(typeof evidence?.crew!=='string'||normalizeCrew(evidence.crew)!==normalizeCrew(currentCrew)))return;
+ const p=evidence?.viewer_watermark,profile=viewerProfile(p),now=Date.now();
+ let saved;try{saved=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');}catch{}
+ if(!profile||!saved||profile.name!==String(saved.name||'').trim()||!Number.isFinite(time)||time>now||now-time>=SESSION_TTL||normalizeCrew(saved.crew)!==normalizeCrew(currentCrew))return;
+ if(restoring&&(p.session_name!==saved.name||p.crew!==normalizeCrew(currentCrew)||p.time!==time))return;
+ if(!restoring&&evidence.allowed!==true&&evidence.ok!==true)return;
+ const bound={...profile,session_name:saved.name,crew:normalizeCrew(currentCrew),time};
+ viewerWatermark={profile,session_name:bound.session_name,crew:bound.crew,time};
+ try{saved.viewer_watermark=bound;sessionStorage.setItem(SESSION_KEY,JSON.stringify(saved));}catch{clearViewerWatermark();return;}
+ viewerWatermarkTimer=setTimeout(clearViewerWatermark,time+SESSION_TTL-now);
+}
+function renderViewerWatermark(){
+ document.querySelectorAll('.viewer-pattern,.viewer-member').forEach(node=>node.remove());
+ const profile=currentViewerWatermark();if(!profile)return;
+ const text=profile.name+' · '+profile.phone_last4;
+ document.querySelectorAll('#result .viewer-price').forEach(cell=>{
+  const layer=document.createElement('span');layer.className='viewer-pattern';layer.setAttribute('aria-hidden','true');
+  for(let i=0;i<8;i++){const repeat=document.createElement('span');repeat.textContent=text;layer.appendChild(repeat);}
+  cell.appendChild(layer);
+ });
+ const area=document.querySelector('#result [data-viewer-label]');if(area){const label=document.createElement('span');label.className='viewer-member';label.textContent=text;area.appendChild(label);}
+}
+window.addEventListener('storage',()=>currentViewerWatermark());
+window.addEventListener('focus',()=>currentViewerWatermark());
+document.addEventListener('visibilitychange',()=>currentViewerWatermark());
+
+function handleAuthSuccess(name, crew, time, evidence = {}, restoring = false) {
+  clearViewerWatermark();
   const normalizedCrew = normalizeCrew(crew);
   const normalizedCurrentCrew = normalizeCrew(currentCrew);
 
@@ -463,6 +515,7 @@ function handleAuthSuccess(name, crew, time) {
     crew: normalizedCrew,
     time: sessionTime
   }));
+  acceptViewerWatermark(evidence,sessionTime,restoring);
 }
 
 document.getElementById('auth_btn').addEventListener('click', async () => {
@@ -471,6 +524,7 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
   const msgArea = document.getElementById('auth_msg');
   const btnEl = document.getElementById('auth_btn');
 
+  clearViewerWatermark();
   inventoryAuth=null;
   const name = nameInput.value.trim();
   const code = codeInput.value.trim();
@@ -502,7 +556,7 @@ document.getElementById('auth_btn').addEventListener('click', async () => {
       const fixedCrew = normalizeCrew(currentCrew);
 
       // ✅ 세션 저장 시에도 확실한 값을 넘겨서 새로고침 시 튕기는 걸 방지합니다.
-      handleAuthSuccess(name, fixedCrew, Date.now());
+      handleAuthSuccess(name, fixedCrew, Date.now(), result);
     } else {
       msgArea.textContent = result.msg || "등록된 정보가 일치하지 않습니다.";
       msgArea.style.display = 'block';
@@ -1057,16 +1111,16 @@ function renderOrderCard(resp){
           <div style="font-weight:700">${name}</div>
           <div class="subtle">${linkHtml}사이즈: ${esc(it.size)}${it.color?` · 색상: ${esc(it.color)}`:''}${it.variant_id?` · 옵션: ${esc(it.variant_id)}`:''}${it.notes?` · 메모: ${esc(it.notes)}`:''}</div>
         </td>
-        <td data-label="가격">${priceTxt}</td>
-        <td data-label="할인율">${disc}</td>
+        <td class="viewer-price" data-label="가격">${priceTxt}</td>
+        <td class="viewer-price" data-label="할인율">${disc}</td>
         <td data-label="수량">${it.qty}</td>
-        <td data-label="소계" style="text-align:right; font-weight:bold">${krw(it.total)}</td>
+        <td class="viewer-price" data-label="소계" style="text-align:right; font-weight:bold">${krw(it.total)}</td>
       </tr>`;
   }).join('');
 
   result.innerHTML = `
     <div class="card">
-      <h3>주문 정보</h3>
+      <h3>주문 정보</h3><div data-viewer-label></div>
       <table class="table">
         <thead>
           <tr><th>상품명</th><th>가격</th><th>할인율</th><th>수량</th><th style="text-align:right">소계</th></tr>
@@ -1074,10 +1128,10 @@ function renderOrderCard(resp){
         <tbody>${rows}</tbody>
       </table>
       <div class="hr"></div>
-      <div class="row2"><div>상품 합계</div><div>${krw(sum.items_total)}</div></div>
+      <div class="row2"><div>상품 합계</div><div class="viewer-price">${krw(sum.items_total)}</div></div>
       <div class="row2"><div>배송비</div><div>${krw(sum.shipping_total)}</div></div>
       <div class="hr"></div>
-      <div class="row2"><div><strong>총 결제금액</strong></div><div><strong>${krw(sum.grand_total)}</strong></div></div>
+      <div class="row2"><div><strong>총 결제금액</strong></div><div class="viewer-price"><strong>${krw(sum.grand_total)}</strong></div></div>
       <div class="hr"></div>
        <div class="row2" style="align-items:flex-start">
         <div><strong>입금계좌 정보</strong></div>
@@ -1091,6 +1145,7 @@ function renderOrderCard(resp){
     </div>
   `;
 
+  renderViewerWatermark();
   $('#confirmBtn').addEventListener('click', submitFinal);
 }
 
@@ -1200,7 +1255,7 @@ btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else d
     const savedTime = Number(data.time);
 
     if (Number.isFinite(savedTime) && now - savedTime < SESSION_TTL && savedCrew === normalizeCrew(currentCrew)) {
-      handleAuthSuccess(data.name, savedCrew, savedTime);
+      handleAuthSuccess(data.name, savedCrew, savedTime, data, true);
     } else {
       sessionStorage.removeItem(SESSION_KEY);
     }

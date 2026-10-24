@@ -183,6 +183,7 @@
   .viewer-member{display:block;max-width:100%;overflow-wrap:anywhere;color:#64748b;font-size:11px;font-weight:400;margin:8px 0}
   @media (forced-colors:active){.viewer-pattern{display:none}}
 </style>
+<link rel="stylesheet" href="./crew-order-ui.css" />
 </head>
 <body>
 <div id="auth_gate" style="position: fixed; inset: 0; background: rgba(250,250,250,1); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(5px);">
@@ -203,7 +204,7 @@
   </div>
 </div>
 
-<div id="main_app" style="display: none;">
+<div id="main_app" data-order-ui-crew="목마교" style="display: none;">
 
 <h1>공동구매 주문</h1>
 
@@ -1276,5 +1277,6 @@ btn.addEventListener('click', () => { if (mode === 'review') enterEdit(); else d
     </a>
 </div>
   
+<script src="./crew-order-ui.js"></script>
 </body>
 </html>

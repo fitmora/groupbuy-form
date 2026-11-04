@@ -479,7 +479,6 @@ function inventoryInstallRow(box){
    }
    const visible=Array.isArray(variants)?variants.filter(v=>v&&!v.hidden):[];
    const isSoldOut=v=>v.code==='SOLD_OUT'||v.stock_status==='SOLD_OUT';
-   const soldOut=visible.filter(isSoldOut);
    state.variants=visible.filter(v=>!productSoldOut&&!isSoldOut(v)&&v.available===true&&typeof v.variant_id==='string'&&v.variant_id&&v.size);
    for(const v of visible){
     const unavailable=isSoldOut(v);
@@ -493,14 +492,12 @@ function inventoryInstallRow(box){
     select.appendChild(option);
    }
    select.disabled=state.variants.length===0;
-   const soldOutText=soldOut.map(optionLabel).filter(Boolean).join(', ');
-   const soldOutNote=soldOut.length?(soldOutText?'품절 옵션: '+soldOutText+'. ':'품절 옵션이 있습니다. '):'';
    if(state.variants.length){
-    hint.textContent=soldOutNote+'구매 가능 표시는 수량 확정이나 재고 확보를 보장하지 않습니다. 품절·취소될 수 있습니다.';
-   }else if(productSoldOut||(visible.length&&soldOut.length===visible.length)){
-    hint.textContent=soldOutNote.trim()||'상품이 품절되었습니다.';
+    hint.textContent='구매 가능 표시는 수량 확정이나 재고 확보를 보장하지 않습니다. 품절·취소될 수 있습니다.';
+   }else if(productSoldOut||(visible.length&&visible.every(isSoldOut))){
+    hint.textContent='전 사이즈 품절';
    }else{
-    showUnverified(soldOutNote+'구매 가능한 옵션의 재고를 확인하지 못했습니다.');
+    showUnverified('구매 가능한 옵션의 재고를 확인하지 못했습니다.');
    }
   }catch(e){
    if(current())showUnverified(e?.code==='MEMBER_REAUTH_REQUIRED'
